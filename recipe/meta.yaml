@@ -1,9 +1,10 @@
 {% set name = "libignition-fuel-tools" %}
 {% set version = "4.0.0" %}
 {% set major_version = version.split('.')[0] %}
+{% set name = base_name + major_version %}
 
 package:
-  name: {{ name + major_version }}
+  name: {{ name }}
   version: {{ version }}
 
 source:
