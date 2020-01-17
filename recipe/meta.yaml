@@ -3,7 +3,7 @@
 {% set major_version = version.split('.')[0] %}
 
 package:
-  name: {{ name }}
+  name: {{ name + major_version }}
   version: {{ version }}
 
 source:
