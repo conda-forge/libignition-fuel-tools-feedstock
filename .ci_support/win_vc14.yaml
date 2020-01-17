@@ -1,0 +1,17 @@
+channel_sources:
+- conda-forge,defaults
+channel_targets:
+- conda-forge main
+jsoncpp:
+- 1.8.4
+libcurl:
+- '7.64'
+pin_run_as_build:
+  jsoncpp:
+    max_pin: x.x.x
+  libcurl:
+    max_pin: x
+  vc:
+    max_pin: x
+vc:
+- '14'
