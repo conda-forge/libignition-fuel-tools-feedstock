@@ -25,7 +25,7 @@ requirements:
     - vs2017_win-32          # [win32]
     - cmake
     - ninja
-    - pkg-config
+    - pkg-config             # [not win]
   host:
     - libignition-msgs5
     - libignition-common3
