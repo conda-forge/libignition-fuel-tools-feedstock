@@ -1,5 +1,5 @@
 {% set base_name = "libignition-fuel-tools" %}
-{% set version = "4.0.0" %}
+{% set version = "4.1.0" %}
 {% set major_version = version.split('.')[0] %}
 {% set name = base_name + major_version %}
 
@@ -9,10 +9,10 @@ package:
 
 source:
   - url: https://bitbucket.org/ignitionrobotics/ign-fuel-tools/get/ignition-fuel-tools{{ major_version }}_{{ version }}.tar.gz
-    sha256: 028cabc616e2b632ae9dde8e5f5d366f09414961bc5beabc637cdf28b8b04f27
+    sha256: e4a14fa6aaee545b9cab4fa47c5744843999b0ea1ca9170699e1747645c8e4f6
 
 build:
-  number: 2
+  number: 0
   skip: true  # [win and vc<14 or osx]
   run_exports:
     - {{ pin_subpackage(name, max_pin='x.x') }}
@@ -54,7 +54,7 @@ about:
   home: https://bitbucket.org/ignitionrobotics/ign-fuel-tools
   license: Apache-2.0
   license_file: LICENSE
-  summary: 'Ignition Fuel Tools is composed by a client library and command line tools for interacting with Ignition Fuel servers.'
+  summary: Ignition Fuel Tools is composed by a client library and command line tools for interacting with Ignition Fuel servers.
 
 extra:
   recipe-maintainers:
