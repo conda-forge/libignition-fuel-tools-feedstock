@@ -8,11 +8,11 @@ package:
   version: {{ version }}
 
 source:
-  - url: https://bitbucket.org/ignitionrobotics/ign-fuel-tools/get/ignition-fuel-tools{{ major_version }}_{{ version }}.tar.gz
-    sha256: e4a14fa6aaee545b9cab4fa47c5744843999b0ea1ca9170699e1747645c8e4f6
+  - url: https://github.com/ignitionrobotics/ign-fuel-tools/archive/ignition-fuel-tools{{ major_version }}_{{ version }}.tar.gz
+    sha256: 01c0b6ae676273853e56dedd32baaf934f4efbfa7d4012967527a2a5fc2f3002
 
 build:
-  number: 1
+  number: 2
   skip: true  # [win and vc<14]
   run_exports:
     - {{ pin_subpackage(name, max_pin='x.x') }}
