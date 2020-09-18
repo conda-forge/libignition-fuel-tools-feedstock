@@ -10,6 +10,8 @@ package:
 source:
   - url: https://github.com/ignitionrobotics/ign-fuel-tools/archive/ignition-fuel-tools{{ major_version }}_{{ version }}.tar.gz
     sha256: 447ee273d6c51577635ee9717d8e13d00273ee54d6d734d740510b129aa550df
+    patches:
+      - fix_ignition_cmake_version.patch
 
 build:
   number: 0
@@ -34,7 +36,7 @@ requirements:
     - libzip
     - yaml
     - tinyxml2
-    - libprotobuf >=3.11
+    - libprotobuf
   run:
     - libignition-msgs5
     - libignition-common3
@@ -43,7 +45,7 @@ requirements:
     - libzip
     - yaml
     - tinyxml2
-    - libprotobuf >=3.11
+    - libprotobuf
 
 test:
   commands:
