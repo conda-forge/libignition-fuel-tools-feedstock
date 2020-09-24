@@ -1,5 +1,5 @@
 {% set base_name = "libignition-fuel-tools" %}
-{% set version = "4.1.0" %}
+{% set version = "4.2.1" %}
 {% set major_version = version.split('.')[0] %}
 {% set name = base_name + major_version %}
 
@@ -9,10 +9,12 @@ package:
 
 source:
   - url: https://github.com/ignitionrobotics/ign-fuel-tools/archive/ignition-fuel-tools{{ major_version }}_{{ version }}.tar.gz
-    sha256: 01c0b6ae676273853e56dedd32baaf934f4efbfa7d4012967527a2a5fc2f3002
+    sha256: 447ee273d6c51577635ee9717d8e13d00273ee54d6d734d740510b129aa550df
+    patches:
+      - fix_ignition_cmake_version.patch
 
 build:
-  number: 2
+  number: 0
   skip: true  # [win and vc<14]
   run_exports:
     - {{ pin_subpackage(name, max_pin='x.x') }}
@@ -34,7 +36,7 @@ requirements:
     - libzip
     - yaml
     - tinyxml2
-    - libprotobuf >=3.11
+    - libprotobuf
   run:
     - libignition-msgs5
     - libignition-common3
@@ -43,7 +45,7 @@ requirements:
     - libzip
     - yaml
     - tinyxml2
-    - libprotobuf >=3.11
+    - libprotobuf
 
 test:
   commands:
