@@ -29,7 +29,7 @@ requirements:
     - ninja
     - pkg-config             # [not win]
   host:
-    - libignition-msgs5
+    - libignition-msgs6
     - libignition-common3
     - libcurl
     - jsoncpp
@@ -38,7 +38,7 @@ requirements:
     - tinyxml2
     - libprotobuf
   run:
-    - libignition-msgs5
+    - libignition-msgs6
     - libignition-common3
     - libcurl
     - jsoncpp
