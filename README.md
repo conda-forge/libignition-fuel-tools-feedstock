@@ -5,11 +5,9 @@ Home: https://bitbucket.org/ignitionrobotics/ign-fuel-tools
 
 Package license: Apache-2.0
 
-Feedstock license: BSD-3-Clause
+Feedstock license: [BSD-3-Clause](https://github.com/conda-forge/libignition-fuel-tools-feedstock/blob/master/LICENSE.txt)
 
 Summary: Ignition Fuel Tools is composed by a client library and command line tools for interacting with Ignition Fuel servers.
-
-
 
 Current build status
 ====================
