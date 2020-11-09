@@ -14,7 +14,7 @@ source:
       - fix_ignition_cmake_version.patch
 
 build:
-  number: 1
+  number: 2
   skip: true  # [win and vc<14]
   run_exports:
     - {{ pin_subpackage(name, max_pin='x') }}
@@ -31,6 +31,7 @@ requirements:
   host:
     - libignition-msgs6
     - libignition-common3
+    - libignition-tools1
     - libcurl
     - jsoncpp
     - libzip
@@ -40,6 +41,7 @@ requirements:
   run:
     - libignition-msgs6
     - libignition-common3
+    - libignition-tools1
     - libcurl
     - jsoncpp
     - libzip
