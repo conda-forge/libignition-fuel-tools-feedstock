@@ -14,8 +14,8 @@ source:
       - fix_ignition_cmake_version.patch
 
 build:
-  number: 2
-  skip: true  # [win and vc<14]
+  number: 3
+  skip: false
   run_exports:
     - {{ pin_subpackage(name, max_pin='x') }}
 
