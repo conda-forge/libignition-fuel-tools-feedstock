@@ -9,7 +9,7 @@ package:
 
 source:
   - url: https://github.com/ignitionrobotics/ign-fuel-tools/archive/ignition-fuel-tools{{ major_version }}_{{ version }}.tar.gz
-    sha256: 0781c346aafafd79f46c1920ece9b6f9ff6f3fa12bd39cf3e6673ef8891fb550
+    sha256: 9f05c067a70059a22f46ccce37dcd02dd9fb7c9091608f61c8a0f4aee9b22a03
     patches:
       - fix_ignition_cmake_version.patch
 
