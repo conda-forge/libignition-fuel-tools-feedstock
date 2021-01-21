@@ -1,7 +1,7 @@
 About libignition-fuel-tools5
 =============================
 
-Home: https://bitbucket.org/ignitionrobotics/ign-fuel-tools
+Home: https://github.com/ignitionrobotics/ign-fuel-tools
 
 Package license: Apache-2.0
 
@@ -149,4 +149,5 @@ Feedstock Maintainers
 
 * [@Tobias-Fischer](https://github.com/Tobias-Fischer/)
 * [@seanyen](https://github.com/seanyen/)
+* [@traversaro](https://github.com/traversaro/)
 
