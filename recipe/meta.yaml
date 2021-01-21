@@ -1,5 +1,5 @@
 {% set base_name = "libignition-fuel-tools" %}
-{% set version = "5.1.1" %}
+{% set version = "4.3.0" %}
 {% set major_version = version.split('.')[0] %}
 {% set name = base_name + major_version %}
 
@@ -9,27 +9,25 @@ package:
 
 source:
   - url: https://github.com/ignitionrobotics/ign-fuel-tools/archive/ignition-fuel-tools{{ major_version }}_{{ version }}.tar.gz
-    sha256: 0781c346aafafd79f46c1920ece9b6f9ff6f3fa12bd39cf3e6673ef8891fb550
+    sha256: 9f05c067a70059a22f46ccce37dcd02dd9fb7c9091608f61c8a0f4aee9b22a03
     patches:
       - fix_ignition_cmake_version.patch
 
 build:
-  number: 1
+  number: 0
   skip: false
   run_exports:
     - {{ pin_subpackage(name, max_pin='x') }}
 
 requirements:
   build:
-    - {{ compiler('cxx') }}  # [not win]
-    - {{ compiler('c') }}    # [not win]
-    - vs2017_win-64          # [win64]
-    - vs2017_win-32          # [win32]
+    - {{ compiler('cxx') }}
+    - {{ compiler('c') }}
     - cmake
     - ninja
     - pkg-config             # [not win]
   host:
-    - libignition-msgs6
+    - libignition-msgs5
     - libignition-common3
     - libignition-tools1
     - libcurl
@@ -39,7 +37,7 @@ requirements:
     - tinyxml2
     - libprotobuf
   run:
-    - libignition-msgs6
+    - libignition-msgs5
     - libignition-common3
     - libignition-tools1
     - libcurl
@@ -55,7 +53,7 @@ test:
     - if exist %PREFIX%\\Library\\include\\ignition\fuel_tools{{ major_version }}\ignition\fuel_tools.hh (exit 0) else (exit 1)  # [win]
 
 about:
-  home: https://bitbucket.org/ignitionrobotics/ign-fuel-tools
+  home: https://github.com/ignitionrobotics/ign-fuel-tools
   license: Apache-2.0
   license_file: LICENSE
   summary: Ignition Fuel Tools is composed by a client library and command line tools for interacting with Ignition Fuel servers.
@@ -64,3 +62,4 @@ extra:
   recipe-maintainers:
     - seanyen
     - Tobias-Fischer
+    - traversaro
