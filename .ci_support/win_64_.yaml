@@ -7,7 +7,7 @@ channel_targets:
 cxx_compiler:
 - vs2017
 jsoncpp:
-- 1.8.4
+- '1.9'
 libcurl:
 - '7'
 libprotobuf:
