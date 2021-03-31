@@ -27,8 +27,8 @@ requirements:
     - pkg-config
   host:
     - libignition-math6
-    - libignition-msgs6
-    - libignition-common3
+    - libignition-msgs7
+    - libignition-common4
     - libignition-tools1
     - libcurl
     - jsoncpp
@@ -37,8 +37,8 @@ requirements:
     - tinyxml2
     - libprotobuf
   run:
-    - libignition-msgs6
-    - libignition-common3
+    - libignition-msgs7
+    - libignition-common4
     - libignition-tools1
     - libcurl
     - jsoncpp
