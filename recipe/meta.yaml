@@ -1,5 +1,5 @@
 {% set base_name = "libignition-fuel-tools" %}
-{% set version = "5.1.1" %}
+{% set version = "6.0.0" %}
 {% set major_version = version.split('.')[0] %}
 {% set name = base_name + major_version %}
 
@@ -9,12 +9,10 @@ package:
 
 source:
   - url: https://github.com/ignitionrobotics/ign-fuel-tools/archive/ignition-fuel-tools{{ major_version }}_{{ version }}.tar.gz
-    sha256: 0781c346aafafd79f46c1920ece9b6f9ff6f3fa12bd39cf3e6673ef8891fb550
-    patches:
-      - fix_ignition_cmake_version.patch
+    sha256: 7be5f00cab43127109b598e01ebe76f173e259e3ff4df2e1c220def19a9de9be
 
 build:
-  number: 6
+  number: 0
   run_exports:
     - {{ pin_subpackage(name, max_pin='x') }}
 
@@ -26,19 +24,10 @@ requirements:
     - ninja
     - pkg-config
   host:
+    - libignition-cmake2
     - libignition-math6
-    - libignition-msgs6
-    - libignition-common3
-    - libignition-tools1
-    - libcurl
-    - jsoncpp
-    - libzip
-    - yaml
-    - tinyxml2
-    - libprotobuf
-  run:
-    - libignition-msgs6
-    - libignition-common3
+    - libignition-msgs7
+    - libignition-common4
     - libignition-tools1
     - libcurl
     - jsoncpp
