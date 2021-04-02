@@ -26,6 +26,7 @@ requirements:
     - ninja
     - pkg-config
   host:
+    - libignition-cmake2
     - libignition-math6
     - libignition-msgs7
     - libignition-common4
