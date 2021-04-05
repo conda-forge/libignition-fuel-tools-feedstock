@@ -36,16 +36,7 @@ requirements:
     - yaml
     - tinyxml2
     - libprotobuf
-  run:
-    - libignition-msgs6
-    - libignition-common3
-    - libignition-tools1
-    - libcurl
-    - jsoncpp
-    - libzip
-    - yaml
-    - tinyxml2
-    - libprotobuf
+    - protobuf
 
 test:
   commands:
