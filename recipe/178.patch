@@ -1,0 +1,2064 @@
+From 50985aaf55e94b3f1c2426d9c80c54e29aaa0628 Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Tue, 30 Mar 2021 17:58:28 +0200
+Subject: [PATCH 01/16] Fixed donwload on Windows
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/LocalCache.cc | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/src/LocalCache.cc b/src/LocalCache.cc
+index c016719..934e1f5 100644
+--- a/src/LocalCache.cc
++++ b/src/LocalCache.cc
+@@ -406,7 +406,11 @@ bool LocalCache::SaveModel(
+   }
+ 
+   auto zipFile = common::joinPaths(modelVersionedDir, _id.Name() + ".zip");
++#ifdef _WIN32
++  std::ofstream ofs(zipFile, std::ofstream::out | std::ofstream::binary);
++#else
+   std::ofstream ofs(zipFile, std::ofstream::out);
++#endif
+   ofs << _data;
+   ofs.close();
+ 
+@@ -750,7 +754,11 @@ bool LocalCache::SaveWorld(
+   }
+ 
+   auto zipFile = common::joinPaths(worldVersionedDir, _id.Name() + ".zip");
+-  std::ofstream ofs(zipFile, std::ofstream::out);
++  #ifdef _WIN32
++    std::ofstream ofs(zipFile, std::ofstream::out | std::ofstream::binary);
++  #else
++    std::ofstream ofs(zipFile, std::ofstream::out);
++  #endif
+   ofs << _data;
+   ofs.close();
+ 
+@@ -771,4 +779,3 @@ bool LocalCache::SaveWorld(
+ 
+   return true;
+ }
+-
+
+From abb6af852bf2157584a5502c45ba9f9bbfc1b922 Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Wed, 31 Mar 2021 12:00:11 +0200
+Subject: [PATCH 02/16] Fixed interface_TEST
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/FuelClient.cc     |  12 +++++
+ src/Interface.cc      |  12 ++++-
+ src/Interface_TEST.cc | 116 ++++++++++++++++++++++--------------------
+ 3 files changed, 82 insertions(+), 58 deletions(-)
+
+diff --git a/src/FuelClient.cc b/src/FuelClient.cc
+index ae7037a..797c8a1 100644
+--- a/src/FuelClient.cc
++++ b/src/FuelClient.cc
+@@ -986,6 +986,12 @@ bool FuelClient::ParseWorldFileUrl(const common::URI &_fileUrl,
+     return false;
+   }
+ 
++  std::vector<std::string> tokens = ignition::common::split(file, "/");
++  std::string fileTemp;
++  for (auto s: tokens)
++    fileTemp = ignition::common::joinPaths(fileTemp, s);
++  file = fileTemp;
++
+   // Get remaining server information from config
+   _id.Server().SetUrl(common::URI(scheme + "://" + server));
+   _id.Server().SetVersion(apiVersion);
+@@ -1230,6 +1236,12 @@ Result FuelClient::CachedModelFile(const common::URI &_fileUrl,
+   // Check if file exists
+   filePath = common::joinPaths(modelPath, filePath);
+ 
++  std::vector<std::string> tokens = ignition::common::split(filePath, "/");
++  std::string sTemp;
++  for (auto s: tokens)
++    sTemp = ignition::common::joinPaths(sTemp, s);
++  filePath = sTemp;
++
+   if (common::exists(filePath))
+   {
+     _path = filePath;
+diff --git a/src/Interface.cc b/src/Interface.cc
+index c2cf3a6..313af31 100644
+--- a/src/Interface.cc
++++ b/src/Interface.cc
+@@ -53,7 +53,11 @@ namespace ignition
+         auto modelUri = _uri.substr(0,
+             _uri.find("files", model.UniqueName().size())-1);
+         _client.DownloadModel(common::URI(modelUri), result);
+-        result += "/" + fileUrl;
++        std::vector<std::string> tokens = ignition::common::split(fileUrl, "/");
++        std::string sTemp;
++        for (auto s: tokens)
++          sTemp = ignition::common::joinPaths(sTemp, s);
++        result = common::joinPaths(result, sTemp);
+       }
+       // Download the world, if it is a world URI
+       else if (_client.ParseWorldUrl(uri, world) &&
+@@ -68,7 +72,11 @@ namespace ignition
+         auto worldUri = _uri.substr(0,
+             _uri.find("files", world.UniqueName().size())-1);
+         _client.DownloadWorld(common::URI(worldUri), result);
+-        result += "/" + fileUrl;
++        std::vector<std::string> tokens = ignition::common::split(fileUrl, "/");
++        std::string sTemp;
++        for (auto s: tokens)
++          sTemp = ignition::common::joinPaths(sTemp, s);
++        result = common::joinPaths(result, sTemp);
+       }
+ 
+       return result;
+diff --git a/src/Interface_TEST.cc b/src/Interface_TEST.cc
+index 41a9a37..4d07ef0 100644
+--- a/src/Interface_TEST.cc
++++ b/src/Interface_TEST.cc
+@@ -39,7 +39,7 @@ using namespace ignition::fuel_tools;
+ /////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST(Interface, IGN_UTILS_TEST_DISABLED_ON_WIN32(FetchResources))
++TEST(Interface, FetchResources)
+ {
+   common::Console::SetVerbosity(4);
+ 
+@@ -71,30 +71,31 @@ TEST(Interface, IGN_UTILS_TEST_DISABLED_ON_WIN32(FetchResources))
+     std::string path = fetchResourceWithClient(modelUrl.Str(), client);
+ 
+     // Check it was downloaded to `2`
+-    EXPECT_EQ(path, common::cwd() +
+-        "/test_cache/fuel.ignitionrobotics.org/chapulina/models/test box/2");
++    EXPECT_EQ(path, common::joinPaths(common::cwd(),"test_cache",
++      "fuel.ignitionrobotics.org", "chapulina", "models", "test box", "2"));
+     EXPECT_TRUE(common::exists(
+-        "test_cache/fuel.ignitionrobotics.org/chapulina/models/test box/2"));
++        common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++          "chapulina", "models", "test box", "2")));
+     EXPECT_TRUE(common::exists(
+-        "test_cache/fuel.ignitionrobotics.org/chapulina/models/test box/2/"
+-        "model.sdf"));
++        common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++          "chapulina", "models", "test box", "2", "model.sdf")));
+     EXPECT_TRUE(common::exists(
+-        "test_cache/fuel.ignitionrobotics.org/chapulina/models/test box/2/"
+-        "model.config"));
++        common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++          "chapulina", "models", "test box", "2", "model.config")));
+ 
+     // Check it wasn't downloaded to model root directory
+     EXPECT_FALSE(common::exists(
+-        "test_cache/fuel.ignitionrobotics.org/chapulina/models"
+-        "/Test box/model.config"));
++        common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++          "chapulina", "models", "Test box", "model.config")));
+ 
+     // Check it is cached
+     {
+       Result res = client.CachedModel(modelUrl, cachedPath);
+       EXPECT_TRUE(res);
+       EXPECT_EQ(Result(ResultType::FETCH_ALREADY_EXISTS), res);
+-      EXPECT_EQ(common::cwd() +
+-          "/test_cache/fuel.ignitionrobotics.org/chapulina/models/test box/2",
+-          cachedPath);
++      EXPECT_EQ(common::joinPaths(common::cwd(), "test_cache",
++        "fuel.ignitionrobotics.org", "chapulina", "models", "test box", "2"),
++        cachedPath);
+      }
+   }
+ 
+@@ -123,34 +124,36 @@ TEST(Interface, IGN_UTILS_TEST_DISABLED_ON_WIN32(FetchResources))
+ 
+     // Check entire model was downloaded to `1`
+     EXPECT_TRUE(common::exists(
+-        "test_cache/fuel.ignitionrobotics.org/openrobotics/models/bus/1"));
+-    EXPECT_EQ(path, common::cwd() +
+-        "/test_cache/fuel.ignitionrobotics.org/openrobotics/models/bus/1/"
+-        "meshes/bus.obj");
++        common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++          "openrobotics", "models", "bus", "1")));
++    EXPECT_EQ(path, common::joinPaths(common::cwd(), "test_cache",
++      "fuel.ignitionrobotics.org", "openrobotics", "models", "bus",
++      "1", "meshes", "bus.obj"));
+     EXPECT_TRUE(common::exists(
+-        "test_cache/fuel.ignitionrobotics.org/openrobotics/models/bus/1/"
+-        "model.sdf"));
++        common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++        "openrobotics", "models", "bus", "1", "model.sdf")));
+     EXPECT_TRUE(common::exists(
+-        "test_cache/fuel.ignitionrobotics.org/openrobotics/models/bus/1/"
+-        "model.config"));
++        common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++          "openrobotics", "models", "bus", "1", "model.config")));
+     EXPECT_TRUE(common::exists(
+-        "test_cache/fuel.ignitionrobotics.org/openrobotics/models/bus/1/"
+-        "meshes/bus.obj"));
++        common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++          "openrobotics", "models", "bus", "1", "meshes/bus.obj")));
+     EXPECT_TRUE(common::exists(
+-        "test_cache/fuel.ignitionrobotics.org/openrobotics/models/bus/1/"
+-        "meshes/bus.mtl"));
++        common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++          "openrobotics", "models", "bus", "1", "meshes/bus.mtl")));
+     EXPECT_TRUE(common::exists(
+-        "test_cache/fuel.ignitionrobotics.org/openrobotics/models/bus/1/"
+-        "materials/textures/bus.png"));
++        common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++          "openrobotics", "models", "bus", "1", "materials", "textures",
++          "bus.png")));
+ 
+     // Check model is cached
+     {
+       Result res = client.CachedModel(modelUrl, cachedPath);
+       EXPECT_TRUE(res);
+       EXPECT_EQ(Result(ResultType::FETCH_ALREADY_EXISTS), res);
+-      EXPECT_EQ(common::cwd() +
+-          "/test_cache/fuel.ignitionrobotics.org/openrobotics/models/bus/1",
+-          cachedPath);
++      EXPECT_EQ(common::joinPaths(common::cwd(), "test_cache",
++        "fuel.ignitionrobotics.org", "openrobotics", "models", "bus", "1"),
++        cachedPath);
+      }
+ 
+     // Check file is cached
+@@ -158,10 +161,9 @@ TEST(Interface, IGN_UTILS_TEST_DISABLED_ON_WIN32(FetchResources))
+       Result res = client.CachedModelFile(modelFileUrl, cachedPath);
+       EXPECT_TRUE(res);
+       EXPECT_EQ(Result(ResultType::FETCH_ALREADY_EXISTS), res);
+-      EXPECT_EQ(common::cwd() +
+-          "/test_cache/fuel.ignitionrobotics.org/openrobotics/models/bus/1"
+-          "/meshes/bus.obj",
+-          cachedPath);
++      EXPECT_EQ(common::joinPaths(common::cwd(), "test_cache",
++        "fuel.ignitionrobotics.org", "openrobotics", "models", "bus", "1",
++        "meshes", "bus.obj"), cachedPath);
+      }
+   }
+ 
+@@ -180,21 +182,23 @@ TEST(Interface, IGN_UTILS_TEST_DISABLED_ON_WIN32(FetchResources))
+     std::string path = fetchResourceWithClient(worldUrl.Str(), client);
+ 
+     // Check it was downloaded to `1`
+-    EXPECT_EQ(path, common::cwd() + "/test_cache/fuel.ignitionrobotics.org/"
+-        "openrobotics/worlds/test world/2");
+-    EXPECT_TRUE(common::exists("test_cache/fuel.ignitionrobotics.org/"
+-        "openrobotics/worlds/test world/2"));
+-    EXPECT_TRUE(common::exists("test_cache/fuel.ignitionrobotics.org/"
+-        "openrobotics/worlds/test world/2/test.world"));
++    EXPECT_EQ(path, common::joinPaths(common::cwd(), "test_cache",
++      "fuel.ignitionrobotics.org","openrobotics", "worlds", "test world", "2"));
++    EXPECT_TRUE(common::exists(common::joinPaths("test_cache",
++      "fuel.ignitionrobotics.org", "openrobotics", "worlds", "test world",
++      "2")));
++    EXPECT_TRUE(common::exists(common::joinPaths("test_cache",
++      "fuel.ignitionrobotics.org", "openrobotics", "worlds", "test world", "2",
++      "test.world")));
+ 
+     // Check it is cached
+     {
+       Result res = client.CachedWorld(worldUrl, cachedPath);
+       EXPECT_TRUE(res);
+       EXPECT_EQ(Result(ResultType::FETCH_ALREADY_EXISTS), res);
+-      EXPECT_EQ(common::cwd() +
+-          "/test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/"
+-          "test world/2", cachedPath);
++      EXPECT_EQ(common::joinPaths(common::cwd(), "test_cache",
++        "fuel.ignitionrobotics.org", "openrobotics", "worlds", "test world",
++        "2"), cachedPath);
+      }
+   }
+ 
+@@ -223,22 +227,23 @@ TEST(Interface, IGN_UTILS_TEST_DISABLED_ON_WIN32(FetchResources))
+ 
+     // Check entire world was downloaded to `1`
+     EXPECT_TRUE(common::exists(
+-        "test_cache/fuel.ignitionrobotics.org/chapulina/worlds/test world/2"));
+-    EXPECT_EQ(path, common::cwd() +
+-        "/test_cache/fuel.ignitionrobotics.org/chapulina/worlds/test world/2/"
+-        "thumbnails/1.png");
++        common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++          "chapulina", "worlds", "test world", "2")));
++    EXPECT_EQ(path, common::joinPaths(common::cwd(), "test_cache",
++      "fuel.ignitionrobotics.org", "chapulina", "worlds", "test world", "2",
++      "thumbnails", "1.png"));
+     EXPECT_TRUE(common::exists(
+-        "test_cache/fuel.ignitionrobotics.org/chapulina/worlds/test world/2/"
+-        "test.world"));
++        common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++          "chapulina", "worlds", "test world", "2", "test.world")));
+ 
+     // Check world is cached
+     {
+       Result res = client.CachedWorld(worldUrl, cachedPath);
+       EXPECT_TRUE(res);
+       EXPECT_EQ(Result(ResultType::FETCH_ALREADY_EXISTS), res);
+-      EXPECT_EQ(common::cwd() +
+-          "/test_cache/fuel.ignitionrobotics.org/chapulina/worlds/test world/2",
+-          cachedPath);
++      EXPECT_EQ(common::joinPaths(common::cwd(), "test_cache",
++        "fuel.ignitionrobotics.org", "chapulina", "worlds", "test world", "2"),
++        cachedPath);
+      }
+ 
+     // Check file is cached
+@@ -246,10 +251,9 @@ TEST(Interface, IGN_UTILS_TEST_DISABLED_ON_WIN32(FetchResources))
+       Result res = client.CachedWorldFile(worldFileUrl, cachedPath);
+       EXPECT_TRUE(res);
+       EXPECT_EQ(Result(ResultType::FETCH_ALREADY_EXISTS), res);
+-      EXPECT_EQ(common::cwd() +
+-          "/test_cache/fuel.ignitionrobotics.org/chapulina/worlds/test world/2"
+-          "/thumbnails/1.png",
+-          cachedPath);
++      EXPECT_EQ(common::joinPaths(common::cwd(), "test_cache",
++        "fuel.ignitionrobotics.org", "chapulina", "worlds", "test world", "2",
++        "thumbnails", "1.png"), cachedPath);
+      }
+   }
+ }
+
+From 3b7e3d8509ed34f4a8a9cfcbd4dabaf47844e120 Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Thu, 8 Apr 2021 20:59:39 +0200
+Subject: [PATCH 03/16] Improved windows support
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/ClientConfig_TEST.cc         | 32 ++++++++++++++++++++++++--------
+ src/CollectionIdentifier_TEST.cc | 27 +--------------------------
+ src/FuelClient_TEST.cc           | 12 ++++++------
+ src/LocalCache_TEST.cc           | 23 ++++++++++++++++-------
+ 4 files changed, 47 insertions(+), 47 deletions(-)
+
+diff --git a/src/ClientConfig_TEST.cc b/src/ClientConfig_TEST.cc
+index 74c5d24..556ea19 100644
+--- a/src/ClientConfig_TEST.cc
++++ b/src/ClientConfig_TEST.cc
+@@ -35,11 +35,7 @@ using namespace fuel_tools;
+ /// \param[in] _path Path to file to be removed.
+ void removeFileTemp(const std::string &_path)
+ {
+-#ifndef _WIN32
+-  EXPECT_TRUE(ignition::common::removeFile(_path));
+-#else
+   ignition::common::removeFile(_path);
+-#endif
+ }
+ 
+ /////////////////////////////////////////////////
+@@ -58,6 +54,20 @@ std::string homePath()
+   return homePath;
+ }
+ 
++/////////////////////////////////////////////////
++/// \brief Get cache directory.
++/// \return Cache directory
++/// \ToDo: Move this function to ignition::common::Filesystem
++std::string cachePath()
++{
++  std::string cachePath;
++#ifndef _WIN32
++  return std::string("/tmp/ignition/fuel");
++#else
++  return std::string("C:\\Windows\\Temp");
++#endif
++}
++
+ /////////////////////////////////////////////////
+ /// \brief Initially only the default server in config
+ TEST(ClientConfig, InitiallyDefaultServers)
+@@ -115,8 +125,9 @@ TEST(ClientConfig, CustomConfiguration)
+       << ""                                       << std::endl
+       << "# Where are the assets stored in disk." << std::endl
+       << "cache:"                                 << std::endl
+-      << "  path: /tmp/ignition/fuel"             << std::endl
++      << "  path: " + cachePath()                 << std::endl
+       << std::endl;
++  ofs.close();
+ 
+   EXPECT_TRUE(config.LoadConfig(testPath));
+ 
+@@ -128,8 +139,7 @@ TEST(ClientConfig, CustomConfiguration)
+   EXPECT_EQ("https://myserver",
+     config.Servers().back().Url().Str());
+ 
+-  EXPECT_EQ("/tmp/ignition/fuel", config.CacheLocation());
+-
++  EXPECT_EQ(cachePath(), config.CacheLocation());
+   // Remove the configuration file.
+   removeFileTemp(testPath);
+ }
+@@ -156,8 +166,9 @@ TEST(ClientConfig, RepeatedServerConfiguration)
+       << ""                                       << std::endl
+       << "# Where are the assets stored in disk." << std::endl
+       << "cache:"                                 << std::endl
+-      << "  path: /tmp/ignition/fuel"             << std::endl
++      << "  path: " + cachePath()                 << std::endl
+       << std::endl;
++  ofs.close();
+ 
+   EXPECT_TRUE(config.LoadConfig(testPath));
+ 
+@@ -182,6 +193,7 @@ TEST(ClientConfig, NoServerUrlConfiguration)
+       << "  -"                                    << std::endl
+       << "    banana: coconut"                           << std::endl
+       << std::endl;
++  ofs.close();
+ 
+   EXPECT_FALSE(config.LoadConfig(testPath));
+ 
+@@ -206,6 +218,7 @@ TEST(ClientConfig, EmptyServerUrlConfiguration)
+       << "  -"                                    << std::endl
+       << "    url: "                              << std::endl
+       << std::endl;
++  ofs.close();
+ 
+   EXPECT_FALSE(config.LoadConfig(testPath));
+ 
+@@ -227,6 +240,7 @@ TEST(ClientConfig, NoCachePathConfiguration)
+   ofs << "---"    << std::endl
+       << "cache:" << std::endl
+       << std::endl;
++  ofs.close();
+ 
+   EXPECT_FALSE(config.LoadConfig(testPath));
+ 
+@@ -249,6 +263,7 @@ TEST(ClientConfig, EmptyCachePathConfiguration)
+       << "cache:"  << std::endl
+       << "  path:" << std::endl
+       << std::endl;
++  ofs.close();
+ 
+   EXPECT_FALSE(config.LoadConfig(testPath));
+ 
+@@ -293,6 +308,7 @@ TEST(ClientConfig, AsString)
+ #ifndef _WIN32
+     EXPECT_NE(str.find(".ignition/fuel"), std::string::npos);
+ #else
++    std::cerr << "str " << str << '\n';
+     EXPECT_NE(str.find(".ignition\\fuel"), std::string::npos);
+ #endif
+     EXPECT_NE(str.find("https://fuel.ignitionrobotics.org"), std::string::npos);
+diff --git a/src/CollectionIdentifier_TEST.cc b/src/CollectionIdentifier_TEST.cc
+index 8df2ea9..3f7381f 100644
+--- a/src/CollectionIdentifier_TEST.cc
++++ b/src/CollectionIdentifier_TEST.cc
+@@ -57,7 +57,6 @@ TEST(CollectionIdentifier, UniqueName)
+   CollectionIdentifier id;
+   id.SetName("hello");
+   id.SetOwner("alice");
+-#ifndef _WIN32
+   id.SetServer(srv1);
+   EXPECT_EQ("https://localhost:8001/alice/collections/hello", id.UniqueName());
+ 
+@@ -66,19 +65,6 @@ TEST(CollectionIdentifier, UniqueName)
+ 
+   id.SetServer(srv3);
+   EXPECT_EQ("https://localhost:8003/alice/collections/hello", id.UniqueName());
+-#else
+-  id.SetServer(srv1);
+-  EXPECT_EQ("https://localhost:8001\\alice\\collections\\hello",
+-      id.UniqueName());
+-
+-  id.SetServer(srv2);
+-  EXPECT_EQ("https://localhost:8002\\alice\\collections\\hello",
+-      id.UniqueName());
+-
+-  id.SetServer(srv3);
+-  EXPECT_EQ("https://localhost:8003\\alice\\collections\\hello",
+-      id.UniqueName());
+-#endif
+ }
+ 
+ /////////////////////////////////////////////////
+@@ -132,25 +118,14 @@ TEST(CollectionIdentifier, AsString)
+   common::Console::SetVerbosity(4);
+   {
+     CollectionIdentifier id;
+-#ifndef _WIN32
+-    std::string str =
+-        "Name: \n"\
+-        "Owner: \n"\
+-        "Unique name: https://fuel.ignitionrobotics.org//collections/\n"
+-        "Server:\n"
+-        "  URL: https://fuel.ignitionrobotics.org\n"
+-        "  Version: 1.0\n"
+-        "  API key: \n";
+-#else
+     std::string str =
+         "Name: \n"\
+         "Owner: \n"\
+-        "Unique name: https://fuel.ignitionrobotics.org\\collections\n"
++        "Unique name: https://fuel.ignitionrobotics.org/collections\n"
+         "Server:\n"
+         "  URL: https://fuel.ignitionrobotics.org\n"
+         "  Version: 1.0\n"
+         "  API key: \n";
+-#endif
+     EXPECT_EQ(str, id.AsString());
+   }
+ 
+diff --git a/src/FuelClient_TEST.cc b/src/FuelClient_TEST.cc
+index 54e6d4f..002e5a7 100644
+--- a/src/FuelClient_TEST.cc
++++ b/src/FuelClient_TEST.cc
+@@ -394,7 +394,7 @@ TEST_F(FuelClientTest, ParseModelFileURL)
+ /////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST_F(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(DownloadModel))
++TEST_F(FuelClientTest, DownloadModel)
+ {
+   // Configure to use binary path as cache
+   ASSERT_EQ(0, ChangeDirectory(PROJECT_BINARY_PATH));
+@@ -593,7 +593,7 @@ TEST_F(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(DownloadModel))
+ /////////////////////////////////////////////////
+ // Windows doesn't support colons in filenames
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/106
+-TEST_F(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(CachedModel))
++TEST_F(FuelClientTest, CachedModel)
+ {
+   // Configure to use binary path as cache and populate it
+   ASSERT_EQ(0, ChangeDirectory(PROJECT_BINARY_PATH));
+@@ -983,7 +983,7 @@ TEST_F(FuelClientTest, ParseWorldFileUrl)
+ //////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST_F(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(DownloadWorld))
++TEST_F(FuelClientTest, DownloadWorld)
+ {
+   // Configure to use binary path as cache
+   ASSERT_EQ(0, ChangeDirectory(PROJECT_BINARY_PATH));
+@@ -1061,7 +1061,7 @@ TEST_F(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(DownloadWorld))
+ /////////////////////////////////////////////////
+ // Windows doesn't support colons in filenames
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/106
+-TEST_F(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(CachedWorld))
++TEST_F(FuelClientTest, CachedWorld)
+ {
+   // Configure to use binary path as cache and populate it
+   ASSERT_EQ(0, ChangeDirectory(PROJECT_BINARY_PATH));
+@@ -1251,7 +1251,7 @@ TEST_F(FuelClientTest, WorldDetails)
+ /////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST_F(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(Models))
++TEST_F(FuelClientTest, Models)
+ {
+   ClientConfig config;
+   config.SetCacheLocation(common::joinPaths(common::cwd(), "test_cache"));
+@@ -1285,7 +1285,7 @@ TEST_F(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(Models))
+ /////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST_F(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(Worlds))
++TEST_F(FuelClientTest, Worlds)
+ {
+   ClientConfig config;
+   config.SetCacheLocation(common::joinPaths(common::cwd(), "test_cache"));
+diff --git a/src/LocalCache_TEST.cc b/src/LocalCache_TEST.cc
+index 7317023..574100b 100644
+--- a/src/LocalCache_TEST.cc
++++ b/src/LocalCache_TEST.cc
+@@ -226,7 +226,7 @@ class LocalCacheTest : public ::testing::Test
+ /// \brief Iterate through all models in cache
+ // Windows doesn't support colons in filenames
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/106
+-TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(AllModels))
++TEST_F(LocalCacheTest, AllModels)
+ {
+   ASSERT_EQ(0, ChangeDirectory(PROJECT_BINARY_PATH));
+   common::removeAll("test_cache");
+@@ -245,10 +245,12 @@ TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(AllModels))
+     uniqueNames.insert(iter->Identification().UniqueName());
+     ++iter;
+   }
++#ifndef _WIN32
+   EXPECT_EQ(9u, uniqueNames.size());
+ 
+   EXPECT_NE(uniqueNames.end(), uniqueNames.find(
+       "http://localhost:8001/alice/models/am1"));
++#endif
+ }
+ 
+ /////////////////////////////////////////////////
+@@ -256,7 +258,7 @@ TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(AllModels))
+ /// \brief Iterate through all models in cache
+ // Windows doesn't support colons in filenames
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/106
+-TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(MatchingModels))
++TEST_F(LocalCacheTest, MatchingModels)
+ {
+   ASSERT_EQ(0, ChangeDirectory(PROJECT_BINARY_PATH));
+   common::removeAll("test_cache");
+@@ -284,7 +286,9 @@ TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(MatchingModels))
+     uniqueNames.insert(iter->Identification().UniqueName());
+     ++iter;
+   }
++#ifndef _WIN32
+   EXPECT_EQ(1u, uniqueNames.size());
++#endif
+ 
+   am1.SetServer(conf.Servers().back());
+   auto iter2 = cache.MatchingModels(am1);
+@@ -296,7 +300,9 @@ TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(MatchingModels))
+     uniqueNames.insert(iter2->Identification().UniqueName());
+     ++iter2;
+   }
++#ifndef _WIN32
+   EXPECT_EQ(2u, uniqueNames.size());
++#endif
+ }
+ 
+ /////////////////////////////////////////////////
+@@ -304,7 +310,7 @@ TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(MatchingModels))
+ /// \brief Iterate through all models in cache
+ // Windows doesn't support colons in filenames
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/106
+-TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(MatchingModel))
++TEST_F(LocalCacheTest, MatchingModel)
+ {
+   ASSERT_EQ(0, ChangeDirectory(PROJECT_BINARY_PATH));
+   common::removeAll("test_cache");
+@@ -362,7 +368,7 @@ TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(MatchingModel))
+ /// \brief Iterate through all models in cache
+ // Windows doesn't support colons in filenames
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/106
+-TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(AllWorlds))
++TEST_F(LocalCacheTest, AllWorlds)
+ {
+   ASSERT_EQ(0, ChangeDirectory(PROJECT_BINARY_PATH));
+   common::removeAll("test_cache");
+@@ -381,10 +387,11 @@ TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(AllWorlds))
+     uniqueNames.insert(iter->UniqueName());
+     ++iter;
+   }
++#ifndef _WIN32
+   EXPECT_EQ(9u, uniqueNames.size());
+-
+   EXPECT_NE(uniqueNames.end(), uniqueNames.find(
+       "localhost:8001/alice/worlds/am1"));
++#endif
+ }
+ 
+ /////////////////////////////////////////////////
+@@ -392,7 +399,7 @@ TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(AllWorlds))
+ /// \brief Iterate through all models in cache
+ // Windows doesn't support colons in filenames
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/106
+-TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(MatchingWorlds))
++TEST_F(LocalCacheTest, MatchingWorlds)
+ {
+   ASSERT_EQ(0, ChangeDirectory(PROJECT_BINARY_PATH));
+   common::removeAll("test_cache");
+@@ -420,7 +427,9 @@ TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(MatchingWorlds))
+     uniqueNames.insert(iter->UniqueName());
+     ++iter;
+   }
++#ifndef _WIN32
+   EXPECT_EQ(1u, uniqueNames.size());
++#endif
+ }
+ 
+ /////////////////////////////////////////////////
+@@ -428,7 +437,7 @@ TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(MatchingWorlds))
+ /// \brief Iterate through all models in cache
+ // Windows doesn't support colons in filenames
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/106
+-TEST_F(LocalCacheTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(MatchingWorld))
++TEST_F(LocalCacheTest, MatchingWorld)
+ {
+   ASSERT_EQ(0, ChangeDirectory(PROJECT_BINARY_PATH));
+   common::removeAll("test_cache");
+
+From dc20b20a3c969844e8423b6bcb0350cb40c2c471 Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Fri, 9 Apr 2021 10:55:58 +0200
+Subject: [PATCH 04/16] Make linters happy
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/FuelClient.cc     | 1 +
+ src/Interface.cc      | 4 ++++
+ src/Interface_TEST.cc | 4 ++--
+ 3 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/src/FuelClient.cc b/src/FuelClient.cc
+index 797c8a1..c3d4d1b 100644
+--- a/src/FuelClient.cc
++++ b/src/FuelClient.cc
+@@ -1024,6 +1024,7 @@ bool FuelClient::ParseWorldFileUrl(const common::URI &_fileUrl,
+ 
+   return true;
+ }
++
+ //////////////////////////////////////////////////
+ bool FuelClient::ParseCollectionUrl(const common::URI &_url,
+     CollectionIdentifier &_id)
+diff --git a/src/Interface.cc b/src/Interface.cc
+index 313af31..e8cce12 100644
+--- a/src/Interface.cc
++++ b/src/Interface.cc
+@@ -56,7 +56,9 @@ namespace ignition
+         std::vector<std::string> tokens = ignition::common::split(fileUrl, "/");
+         std::string sTemp;
+         for (auto s: tokens)
++        {
+           sTemp = ignition::common::joinPaths(sTemp, s);
++        }
+         result = common::joinPaths(result, sTemp);
+       }
+       // Download the world, if it is a world URI
+@@ -75,7 +77,9 @@ namespace ignition
+         std::vector<std::string> tokens = ignition::common::split(fileUrl, "/");
+         std::string sTemp;
+         for (auto s: tokens)
++        {
+           sTemp = ignition::common::joinPaths(sTemp, s);
++        }
+         result = common::joinPaths(result, sTemp);
+       }
+ 
+diff --git a/src/Interface_TEST.cc b/src/Interface_TEST.cc
+index 4d07ef0..0a0e4a8 100644
+--- a/src/Interface_TEST.cc
++++ b/src/Interface_TEST.cc
+@@ -71,7 +71,7 @@ TEST(Interface, FetchResources)
+     std::string path = fetchResourceWithClient(modelUrl.Str(), client);
+ 
+     // Check it was downloaded to `2`
+-    EXPECT_EQ(path, common::joinPaths(common::cwd(),"test_cache",
++    EXPECT_EQ(path, common::joinPaths(common::cwd(), "test_cache",
+       "fuel.ignitionrobotics.org", "chapulina", "models", "test box", "2"));
+     EXPECT_TRUE(common::exists(
+         common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
+@@ -183,7 +183,7 @@ TEST(Interface, FetchResources)
+ 
+     // Check it was downloaded to `1`
+     EXPECT_EQ(path, common::joinPaths(common::cwd(), "test_cache",
+-      "fuel.ignitionrobotics.org","openrobotics", "worlds", "test world", "2"));
++      "fuel.ignitionrobotics.org", "openrobotics", "worlds", "test world", "2"));
+     EXPECT_TRUE(common::exists(common::joinPaths("test_cache",
+       "fuel.ignitionrobotics.org", "openrobotics", "worlds", "test world",
+       "2")));
+
+From 2161f6819a5b05db1462d6c334fd829609192fb7 Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Fri, 9 Apr 2021 10:59:51 +0200
+Subject: [PATCH 05/16] Make linters happy
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/FuelClient.cc     | 4 ++--
+ src/Interface.cc      | 8 ++------
+ src/Interface_TEST.cc | 3 ++-
+ 3 files changed, 6 insertions(+), 9 deletions(-)
+
+diff --git a/src/FuelClient.cc b/src/FuelClient.cc
+index c3d4d1b..a672f76 100644
+--- a/src/FuelClient.cc
++++ b/src/FuelClient.cc
+@@ -988,7 +988,7 @@ bool FuelClient::ParseWorldFileUrl(const common::URI &_fileUrl,
+ 
+   std::vector<std::string> tokens = ignition::common::split(file, "/");
+   std::string fileTemp;
+-  for (auto s: tokens)
++  for (auto s : tokens)
+     fileTemp = ignition::common::joinPaths(fileTemp, s);
+   file = fileTemp;
+ 
+@@ -1239,7 +1239,7 @@ Result FuelClient::CachedModelFile(const common::URI &_fileUrl,
+ 
+   std::vector<std::string> tokens = ignition::common::split(filePath, "/");
+   std::string sTemp;
+-  for (auto s: tokens)
++  for (auto s : tokens)
+     sTemp = ignition::common::joinPaths(sTemp, s);
+   filePath = sTemp;
+ 
+diff --git a/src/Interface.cc b/src/Interface.cc
+index e8cce12..c82cbba 100644
+--- a/src/Interface.cc
++++ b/src/Interface.cc
+@@ -55,10 +55,8 @@ namespace ignition
+         _client.DownloadModel(common::URI(modelUri), result);
+         std::vector<std::string> tokens = ignition::common::split(fileUrl, "/");
+         std::string sTemp;
+-        for (auto s: tokens)
+-        {
++        for (auto s : tokens)
+           sTemp = ignition::common::joinPaths(sTemp, s);
+-        }
+         result = common::joinPaths(result, sTemp);
+       }
+       // Download the world, if it is a world URI
+@@ -76,10 +74,8 @@ namespace ignition
+         _client.DownloadWorld(common::URI(worldUri), result);
+         std::vector<std::string> tokens = ignition::common::split(fileUrl, "/");
+         std::string sTemp;
+-        for (auto s: tokens)
+-        {
++        for (auto s : tokens)
+           sTemp = ignition::common::joinPaths(sTemp, s);
+-        }
+         result = common::joinPaths(result, sTemp);
+       }
+ 
+diff --git a/src/Interface_TEST.cc b/src/Interface_TEST.cc
+index 0a0e4a8..4f342f1 100644
+--- a/src/Interface_TEST.cc
++++ b/src/Interface_TEST.cc
+@@ -183,7 +183,8 @@ TEST(Interface, FetchResources)
+ 
+     // Check it was downloaded to `1`
+     EXPECT_EQ(path, common::joinPaths(common::cwd(), "test_cache",
+-      "fuel.ignitionrobotics.org", "openrobotics", "worlds", "test world", "2"));
++      "fuel.ignitionrobotics.org", "openrobotics", "worlds",
++      "test world", "2"));
+     EXPECT_TRUE(common::exists(common::joinPaths("test_cache",
+       "fuel.ignitionrobotics.org", "openrobotics", "worlds", "test world",
+       "2")));
+
+From d82d3b39de49b854f5fed5186ca99ed4180327fe Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Fri, 9 Apr 2021 12:07:52 +0200
+Subject: [PATCH 06/16] Improved
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/CollectionIdentifier.cc | 19 ++++++++++++++++---
+ src/FuelClient.cc           |  2 ++
+ src/Interface.cc            |  4 ++++
+ 3 files changed, 22 insertions(+), 3 deletions(-)
+
+diff --git a/src/CollectionIdentifier.cc b/src/CollectionIdentifier.cc
+index 86cac42..b5f9ff9 100644
+--- a/src/CollectionIdentifier.cc
++++ b/src/CollectionIdentifier.cc
+@@ -71,9 +71,22 @@ CollectionIdentifier::~CollectionIdentifier() = default;
+ //////////////////////////////////////////////////
+ std::string CollectionIdentifier::UniqueName() const
+ {
+-  return common::joinPaths(this->dataPtr->server.Url().Str(),
+-                           this->dataPtr->owner, "collections",
+-                           this->dataPtr->name);
++  std::vector<std::string> stringList = {this->dataPtr->server.Url().Str(),
++    this->dataPtr->owner, "collections", this->dataPtr->name};
++
++  // This loop is to avoid duplicated '/' and '/' at the end of the string
++  std::string result;
++  for (auto s : stringList)
++  {
++    std::string tmp = common::joinPaths(result, s);
++    if (tmp[0] == '/')
++      tmp.erase(0, 1);
++    if(tmp[tmp.length()-1] == '/')
++      tmp.erase(tmp.length()-1, 1);
++    result = tmp;
++  }
++
++  return result;
+ }
+ 
+ //////////////////////////////////////////////////
+diff --git a/src/FuelClient.cc b/src/FuelClient.cc
+index a672f76..b98c32d 100644
+--- a/src/FuelClient.cc
++++ b/src/FuelClient.cc
+@@ -990,6 +990,8 @@ bool FuelClient::ParseWorldFileUrl(const common::URI &_fileUrl,
+   std::string fileTemp;
+   for (auto s : tokens)
+     fileTemp = ignition::common::joinPaths(fileTemp, s);
++  if(fileTemp[0] == '/')
++    fileTemp.erase(0, 1);
+   file = fileTemp;
+ 
+   // Get remaining server information from config
+diff --git a/src/Interface.cc b/src/Interface.cc
+index c82cbba..e1a2ca8 100644
+--- a/src/Interface.cc
++++ b/src/Interface.cc
+@@ -57,6 +57,8 @@ namespace ignition
+         std::string sTemp;
+         for (auto s : tokens)
+           sTemp = ignition::common::joinPaths(sTemp, s);
++        if(sTemp[0] == '/')
++          sTemp.erase(0, 1);
+         result = common::joinPaths(result, sTemp);
+       }
+       // Download the world, if it is a world URI
+@@ -76,6 +78,8 @@ namespace ignition
+         std::string sTemp;
+         for (auto s : tokens)
+           sTemp = ignition::common::joinPaths(sTemp, s);
++        if(sTemp[0] == '/')
++          sTemp.erase(0, 1);
+         result = common::joinPaths(result, sTemp);
+       }
+ 
+
+From 898b0de38c490737523bbd5bd46cd65af0067ee3 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Alejandro=20Herna=CC=81ndez?= <ahcorde@gmail.com>
+Date: Tue, 13 Apr 2021 09:18:31 +0200
+Subject: [PATCH 07/16] Fixed test on Windows
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Alejandro Hernández <ahcorde@gmail.com>
+---
+ src/ModelIdentifier_TEST.cc | 23 +----------------------
+ 1 file changed, 1 insertion(+), 22 deletions(-)
+
+diff --git a/src/ModelIdentifier_TEST.cc b/src/ModelIdentifier_TEST.cc
+index b4c7996..307e453 100644
+--- a/src/ModelIdentifier_TEST.cc
++++ b/src/ModelIdentifier_TEST.cc
+@@ -148,12 +148,11 @@ TEST(ModelIdentifier, AsString)
+   common::Console::SetVerbosity(4);
+   {
+     ModelIdentifier id;
+-#ifndef _WIN32
+     std::string str =
+         "Name: \n"\
+         "Owner: \n"\
+         "Version: tip\n"\
+-        "Unique name: https://fuel.ignitionrobotics.org//models/\n"
++        "Unique name: https://fuel.ignitionrobotics.org/models\n"
+         "Description: \n"
+         "File size: 0\n"
+         "Upload date: 0\n"
+@@ -167,26 +166,6 @@ TEST(ModelIdentifier, AsString)
+         "  URL: https://fuel.ignitionrobotics.org\n"
+         "  Version: 1.0\n"
+         "  API key: \n";
+-#else
+-    std::string str =
+-        "Name: \n"\
+-        "Owner: \n"\
+-        "Version: tip\n"\
+-        "Unique name: https://fuel.ignitionrobotics.org\\models\n"
+-        "Description: \n"
+-        "File size: 0\n"
+-        "Upload date: 0\n"
+-        "Likes: 0\n"
+-        "Downloads: 0\n"
+-        "License name: \n"
+-        "License URL: \n"
+-        "License image URL: \n"
+-        "Tags: \n"
+-        "Server:\n"
+-        "  URL: https://fuel.ignitionrobotics.org\n"
+-        "  Version: 1.0\n"
+-        "  API key: \n";
+-#endif
+     EXPECT_EQ(str, id.AsString());
+   }
+ 
+
+From 05063667739d4fac08623bf50f7de5e52e8d1a6f Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Tue, 13 Apr 2021 10:20:51 +0200
+Subject: [PATCH 08/16] Fixed test
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/ModelIdentifier.cc | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/src/ModelIdentifier.cc b/src/ModelIdentifier.cc
+index 9d7a15a..344087c 100644
+--- a/src/ModelIdentifier.cc
++++ b/src/ModelIdentifier.cc
+@@ -143,10 +143,22 @@ ModelIdentifier::~ModelIdentifier()
+ //////////////////////////////////////////////////
+ std::string ModelIdentifier::UniqueName() const
+ {
+-  return common::joinPaths(this->dataPtr->server.Url().Str(),
+-                           this->dataPtr->owner,
+-                           "models",
+-                           this->dataPtr->name);
++  std::vector<std::string> stringList = {this->dataPtr->server.Url().Str(),
++    this->dataPtr->owner, "models", this->dataPtr->name};
++
++  // This loop is to avoid duplicated '/' and '/' at the end of the string
++  std::string result;
++  for (auto s : stringList)
++  {
++    std::string tmp = common::joinPaths(result, s);
++    if (tmp[0] == '/')
++      tmp.erase(0, 1);
++    if(tmp[tmp.length()-1] == '/')
++      tmp.erase(tmp.length()-1, 1);
++    result = tmp;
++  }
++
++  return result;
+ }
+ 
+ //////////////////////////////////////////////////
+
+From 1dce04b1b9c40510dba0dc8a81f0e51ac7c46dab Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Tue, 13 Apr 2021 19:14:41 +0200
+Subject: [PATCH 09/16] Fix some nits
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/ClientConfig_TEST.cc    | 2 --
+ src/CollectionIdentifier.cc | 3 +--
+ src/ModelIdentifier.cc      | 2 +-
+ 3 files changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/src/ClientConfig_TEST.cc b/src/ClientConfig_TEST.cc
+index 556ea19..4066936 100644
+--- a/src/ClientConfig_TEST.cc
++++ b/src/ClientConfig_TEST.cc
+@@ -308,7 +308,6 @@ TEST(ClientConfig, AsString)
+ #ifndef _WIN32
+     EXPECT_NE(str.find(".ignition/fuel"), std::string::npos);
+ #else
+-    std::cerr << "str " << str << '\n';
+     EXPECT_NE(str.find(".ignition\\fuel"), std::string::npos);
+ #endif
+     EXPECT_NE(str.find("https://fuel.ignitionrobotics.org"), std::string::npos);
+@@ -433,4 +432,3 @@ int main(int argc, char **argv)
+   ::testing::InitGoogleTest(&argc, argv);
+   return RUN_ALL_TESTS();
+ }
+-
+diff --git a/src/CollectionIdentifier.cc b/src/CollectionIdentifier.cc
+index b5f9ff9..4bc9096 100644
+--- a/src/CollectionIdentifier.cc
++++ b/src/CollectionIdentifier.cc
+@@ -76,7 +76,7 @@ std::string CollectionIdentifier::UniqueName() const
+ 
+   // This loop is to avoid duplicated '/' and '/' at the end of the string
+   std::string result;
+-  for (auto s : stringList)
++  for (const auto &s : stringList)
+   {
+     std::string tmp = common::joinPaths(result, s);
+     if (tmp[0] == '/')
+@@ -169,4 +169,3 @@ std::string CollectionIdentifier::AsPrettyString(
+       << this->Server().AsPrettyString(_prefix + "  ");
+   return out.str();
+ }
+-
+diff --git a/src/ModelIdentifier.cc b/src/ModelIdentifier.cc
+index 344087c..2581221 100644
+--- a/src/ModelIdentifier.cc
++++ b/src/ModelIdentifier.cc
+@@ -148,7 +148,7 @@ std::string ModelIdentifier::UniqueName() const
+ 
+   // This loop is to avoid duplicated '/' and '/' at the end of the string
+   std::string result;
+-  for (auto s : stringList)
++  for (const auto &s : stringList)
+   {
+     std::string tmp = common::joinPaths(result, s);
+     if (tmp[0] == '/')
+
+From 1687ed9a5979676fccaa686a82eb46f1b463c01b Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Wed, 14 Apr 2021 09:25:33 +0200
+Subject: [PATCH 10/16] Improved Windows support
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/CollectionIdentifier.cc | 19 +++----------------
+ src/Interface.cc            | 17 +++--------------
+ src/LocalCache_TEST.cc      | 10 +---------
+ src/ModelIdentifier.cc      | 19 +++----------------
+ 4 files changed, 10 insertions(+), 55 deletions(-)
+
+diff --git a/src/CollectionIdentifier.cc b/src/CollectionIdentifier.cc
+index 4bc9096..02cf65d 100644
+--- a/src/CollectionIdentifier.cc
++++ b/src/CollectionIdentifier.cc
+@@ -71,22 +71,9 @@ CollectionIdentifier::~CollectionIdentifier() = default;
+ //////////////////////////////////////////////////
+ std::string CollectionIdentifier::UniqueName() const
+ {
+-  std::vector<std::string> stringList = {this->dataPtr->server.Url().Str(),
+-    this->dataPtr->owner, "collections", this->dataPtr->name};
+-
+-  // This loop is to avoid duplicated '/' and '/' at the end of the string
+-  std::string result;
+-  for (const auto &s : stringList)
+-  {
+-    std::string tmp = common::joinPaths(result, s);
+-    if (tmp[0] == '/')
+-      tmp.erase(0, 1);
+-    if(tmp[tmp.length()-1] == '/')
+-      tmp.erase(tmp.length()-1, 1);
+-    result = tmp;
+-  }
+-
+-  return result;
++  return common::joinPaths(this->dataPtr->server.Url().Str(),
++                           this->dataPtr->owner, "collections",
++                           this->dataPtr->name);
+ }
+ 
+ //////////////////////////////////////////////////
+diff --git a/src/Interface.cc b/src/Interface.cc
+index e1a2ca8..34ebe4c 100644
+--- a/src/Interface.cc
++++ b/src/Interface.cc
+@@ -53,13 +53,7 @@ namespace ignition
+         auto modelUri = _uri.substr(0,
+             _uri.find("files", model.UniqueName().size())-1);
+         _client.DownloadModel(common::URI(modelUri), result);
+-        std::vector<std::string> tokens = ignition::common::split(fileUrl, "/");
+-        std::string sTemp;
+-        for (auto s : tokens)
+-          sTemp = ignition::common::joinPaths(sTemp, s);
+-        if(sTemp[0] == '/')
+-          sTemp.erase(0, 1);
+-        result = common::joinPaths(result, sTemp);
++        result = common::joinPaths(result, fileUrl);
+       }
+       // Download the world, if it is a world URI
+       else if (_client.ParseWorldUrl(uri, world) &&
+@@ -74,13 +68,8 @@ namespace ignition
+         auto worldUri = _uri.substr(0,
+             _uri.find("files", world.UniqueName().size())-1);
+         _client.DownloadWorld(common::URI(worldUri), result);
+-        std::vector<std::string> tokens = ignition::common::split(fileUrl, "/");
+-        std::string sTemp;
+-        for (auto s : tokens)
+-          sTemp = ignition::common::joinPaths(sTemp, s);
+-        if(sTemp[0] == '/')
+-          sTemp.erase(0, 1);
+-        result = common::joinPaths(result, sTemp);
++        result = common::joinPaths(result, fileUrl);
++
+       }
+ 
+       return result;
+diff --git a/src/LocalCache_TEST.cc b/src/LocalCache_TEST.cc
+index 574100b..10059b7 100644
+--- a/src/LocalCache_TEST.cc
++++ b/src/LocalCache_TEST.cc
+@@ -245,12 +245,10 @@ TEST_F(LocalCacheTest, AllModels)
+     uniqueNames.insert(iter->Identification().UniqueName());
+     ++iter;
+   }
+-#ifndef _WIN32
+   EXPECT_EQ(9u, uniqueNames.size());
+ 
+   EXPECT_NE(uniqueNames.end(), uniqueNames.find(
+       "http://localhost:8001/alice/models/am1"));
+-#endif
+ }
+ 
+ /////////////////////////////////////////////////
+@@ -286,9 +284,7 @@ TEST_F(LocalCacheTest, MatchingModels)
+     uniqueNames.insert(iter->Identification().UniqueName());
+     ++iter;
+   }
+-#ifndef _WIN32
+   EXPECT_EQ(1u, uniqueNames.size());
+-#endif
+ 
+   am1.SetServer(conf.Servers().back());
+   auto iter2 = cache.MatchingModels(am1);
+@@ -300,9 +296,7 @@ TEST_F(LocalCacheTest, MatchingModels)
+     uniqueNames.insert(iter2->Identification().UniqueName());
+     ++iter2;
+   }
+-#ifndef _WIN32
+   EXPECT_EQ(2u, uniqueNames.size());
+-#endif
+ }
+ 
+ /////////////////////////////////////////////////
+@@ -387,8 +381,8 @@ TEST_F(LocalCacheTest, AllWorlds)
+     uniqueNames.insert(iter->UniqueName());
+     ++iter;
+   }
+-#ifndef _WIN32
+   EXPECT_EQ(9u, uniqueNames.size());
++#ifndef _WIN32
+   EXPECT_NE(uniqueNames.end(), uniqueNames.find(
+       "localhost:8001/alice/worlds/am1"));
+ #endif
+@@ -427,9 +421,7 @@ TEST_F(LocalCacheTest, MatchingWorlds)
+     uniqueNames.insert(iter->UniqueName());
+     ++iter;
+   }
+-#ifndef _WIN32
+   EXPECT_EQ(1u, uniqueNames.size());
+-#endif
+ }
+ 
+ /////////////////////////////////////////////////
+diff --git a/src/ModelIdentifier.cc b/src/ModelIdentifier.cc
+index 2581221..1b50d0c 100644
+--- a/src/ModelIdentifier.cc
++++ b/src/ModelIdentifier.cc
+@@ -143,22 +143,9 @@ ModelIdentifier::~ModelIdentifier()
+ //////////////////////////////////////////////////
+ std::string ModelIdentifier::UniqueName() const
+ {
+-  std::vector<std::string> stringList = {this->dataPtr->server.Url().Str(),
+-    this->dataPtr->owner, "models", this->dataPtr->name};
+-
+-  // This loop is to avoid duplicated '/' and '/' at the end of the string
+-  std::string result;
+-  for (const auto &s : stringList)
+-  {
+-    std::string tmp = common::joinPaths(result, s);
+-    if (tmp[0] == '/')
+-      tmp.erase(0, 1);
+-    if(tmp[tmp.length()-1] == '/')
+-      tmp.erase(tmp.length()-1, 1);
+-    result = tmp;
+-  }
+-
+-  return result;
++  return common::joinPaths(this->dataPtr->server.Url().Str(),
++                           this->dataPtr->owner, "models",
++                           this->dataPtr->name);
+ }
+ 
+ //////////////////////////////////////////////////
+
+From 8302dbd37a2f889509cb09856acc36848181b4b1 Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Mon, 19 Apr 2021 11:42:51 +0200
+Subject: [PATCH 11/16] Fixed test on Linux
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/WorldIdentifier_TEST.cc |   2 +-
+ src/Zip.cc                  |  17 +++--
+ src/ign_src_TEST.cc         | 137 ++++++++++++++++++++----------------
+ 3 files changed, 85 insertions(+), 71 deletions(-)
+
+diff --git a/src/WorldIdentifier_TEST.cc b/src/WorldIdentifier_TEST.cc
+index f2384c3..c0a9965 100644
+--- a/src/WorldIdentifier_TEST.cc
++++ b/src/WorldIdentifier_TEST.cc
+@@ -120,7 +120,7 @@ TEST(WorldIdentifier, AsString)
+         "Name: \n"\
+         "Owner: \n"\
+         "Version: tip\n"\
+-        "Unique name: fuel.ignitionrobotics.org//worlds/\n"
++        "Unique name: fuel.ignitionrobotics.org/worlds\n"
+         "Local path: \n"
+         "Server:\n"
+         "  URL: https://fuel.ignitionrobotics.org\n"
+diff --git a/src/Zip.cc b/src/Zip.cc
+index 4ac51e7..947daaf 100644
+--- a/src/Zip.cc
++++ b/src/Zip.cc
+@@ -143,15 +143,14 @@ bool Zip::Extract(const std::string &_src,
+     // Create intermediate directories if needed.
+     std::string dirname = dst;
+ 
+-    auto pos = dirname.rfind(ignition::common::separator(""));
+-    if (pos != std::string::npos && pos != dirname.size() - 1)
+-      dirname.erase(pos);
+-
+-    if (!ignition::common::createDirectories(dirname))
+-    {
+-      ignerr << "Error creating directory [" << dirname << "]. "
+-             << "Do you have the right permissions?" << std::endl;
+-      return false;
++    auto pos = entryname.rfind(ignition::common::separator(""));
++    if (pos != std::string::npos && pos == (entryname.size() - 1)){
++      if (!ignition::common::createDirectories(dirname))
++      {
++        ignerr << "Error creating directory [" << dirname << "]. "
++               << "Do you have the right permissions?" << std::endl;
++        return false;
++      }
+     }
+ 
+     // Create and write the files.
+diff --git a/src/ign_src_TEST.cc b/src/ign_src_TEST.cc
+index 59197f6..0709a0c 100644
+--- a/src/ign_src_TEST.cc
++++ b/src/ign_src_TEST.cc
+@@ -80,7 +80,7 @@ TEST(CmdLine, ModelListFail)
+ /////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST(CmdLine, IGN_UTILS_TEST_DISABLED_ON_WIN32(ModelListConfigServerUgly))
++TEST(CmdLine, ModelListConfigServerUgly)
+ {
+   std::stringstream stdOutBuffer;
+   std::stringstream stdErrBuffer;
+@@ -100,7 +100,7 @@ TEST(CmdLine, IGN_UTILS_TEST_DISABLED_ON_WIN32(ModelListConfigServerUgly))
+ /////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST(CmdLine, IGN_UTILS_TEST_DISABLED_ON_WIN32(ModelListConfigServerPretty))
++TEST(CmdLine, ModelListConfigServerPretty)
+ {
+   std::stringstream stdOutBuffer;
+   std::stringstream stdErrBuffer;
+@@ -129,8 +129,7 @@ TEST(CmdLine, IGN_UTILS_TEST_DISABLED_ON_WIN32(ModelListConfigServerPretty))
+ /////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST(CmdLine, IGN_UTILS_TEST_DISABLED_ON_WIN32(
+-    ModelListConfigServerPrettyOwner))
++TEST(CmdLine, ModelListConfigServerPrettyOwner)
+ {
+   std::stringstream stdOutBuffer;
+   std::stringstream stdErrBuffer;
+@@ -199,7 +198,7 @@ TEST(CmdLine, ModelDownloadWrongUrl)
+ /////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST(CmdLine, IGN_UTILS_TEST_DISABLED_ON_WIN32(ModelDownloadUnversioned))
++TEST(CmdLine, ModelDownloadUnversioned)
+ {
+   cmdVerbosity("4");
+ 
+@@ -236,7 +235,7 @@ TEST(CmdLine, IGN_UTILS_TEST_DISABLED_ON_WIN32(ModelDownloadUnversioned))
+ /////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST(CmdLine, IGN_UTILS_TEST_DISABLED_ON_WIN32(DownloadConfigCache))
++TEST(CmdLine, DownloadConfigCache)
+ {
+   cmdVerbosity("4");
+ 
+@@ -307,8 +306,7 @@ TEST(CmdLine, WorldListFail)
+ /////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(
+-    WorldListConfigServerUgly))
++TEST(FuelClientTest, WorldListConfigServerUgly)
+ {
+   std::stringstream stdOutBuffer;
+   std::stringstream stdErrBuffer;
+@@ -330,8 +328,7 @@ TEST(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(
+ /////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(
+-    WorldListConfigServerPretty))
++TEST(FuelClientTest, WorldListConfigServerPretty)
+ {
+   std::stringstream stdOutBuffer;
+   std::stringstream stdErrBuffer;
+@@ -390,8 +387,7 @@ TEST(CmdLine, WorldListCustomServerPrettyOwner)
+ /////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(
+-    WorldDownloadBadUrl))
++TEST(FuelClientTest, WorldDownloadBadUrl)
+ {
+   std::stringstream stdOutBuffer;
+   std::stringstream stdErrBuffer;
+@@ -428,8 +424,7 @@ TEST(CmdLine, WorldDownloadWrongUrl)
+ /////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(
+-    WorldDownloadUnversioned))
++TEST(FuelClientTest, WorldDownloadUnversioned)
+ {
+   cmdVerbosity("4");
+ 
+@@ -452,12 +447,14 @@ TEST(FuelClientTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(
+ 
+   // Check files
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/test world"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++        "worlds", "test world")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/test world/2"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "worlds", "test world", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-      std::string("test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/")
+-      + "test world/2/test.world"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "worlds", "test world", "2", "test.world")));
+ 
+   clearIOStreams(stdOutBuffer, stdErrBuffer);
+   restoreIO();
+@@ -474,7 +471,7 @@ INSTANTIATE_TEST_CASE_P(CollectionTest, DownloadCollectionTest,
+ /////////////////////////////////////////////////
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST_P(DownloadCollectionTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(AllItems))
++TEST_P(DownloadCollectionTest, AllItems)
+ {
+   cmdVerbosity("4");
+ 
+@@ -500,40 +497,47 @@ TEST_P(DownloadCollectionTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(AllItems))
+   // Check files
+   // Model: Backpack
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/models/backpack"));
++      ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++        "models", "backpack")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/models/backpack/2"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "models", "backpack", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-      std::string("test_cache/fuel.ignitionrobotics.org/openrobotics/models/") +
+-      "backpack/2/model.sdf"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "models", "backpack", "2", "model.sdf")));
+ 
+   // Model: TEAMBASE
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/models/teambase"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "models", "teambase")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/models/teambase/2"));
++     ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "models", "teambase", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-      std::string("test_cache/fuel.ignitionrobotics.org/openrobotics/models/") +
+-      "teambase/2/model.sdf"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++     "models", "teambase", "2", "model.sdf")));
+ 
+   // World: Test World
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/test world"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++        "worlds", "test world")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/test world/2"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "worlds", "test world", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-      std::string("test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/") +
+-      "test world/2/test.world"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "worlds", "test world", "2", "test.world")));
+ 
+   // World: Test World 2
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/test world 2"));
+-  EXPECT_TRUE(
+-      ignition::common::isDirectory("test_cache/fuel.ignitionrobotics.org/"
+-                                    "openrobotics/worlds/test world 2/2"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "worlds", "test world 2")));
++  EXPECT_TRUE(ignition::common::isDirectory(
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "worlds", "test world 2", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-      std::string("test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/") +
+-      "test world 2/2/test.world"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "worlds", "test world 2", "2", "test.world")));
+   clearIOStreams(stdOutBuffer, stdErrBuffer);
+   restoreIO();
+ }
+@@ -542,7 +546,7 @@ TEST_P(DownloadCollectionTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(AllItems))
+ /// Download only models
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST_P(DownloadCollectionTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(Models))
++TEST_P(DownloadCollectionTest, Models)
+ {
+   cmdVerbosity("4");
+ 
+@@ -568,29 +572,35 @@ TEST_P(DownloadCollectionTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(Models))
+   // Check files
+   // Model: Backpack
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/models/backpack"));
++      ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++        "models", "backpack")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/models/backpack/2"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "models", "backpack", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-      std::string("test_cache/fuel.ignitionrobotics.org/openrobotics/models/") +
+-      "backpack/2/model.sdf"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "models", "backpack", "2", "model.sdf")));
+ 
+   // Model: TEAMBASE
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/models/teambase"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "models", "teambase")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/models/teambase/2"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "models", "teambase", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-      std::string("test_cache/fuel.ignitionrobotics.org/openrobotics/models/") +
+-      "teambase/2/model.sdf"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "models", "teambase", "2", "model.sdf")));
+ 
+   // World: Test World
+   EXPECT_FALSE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/test world"));
++      ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++        "worlds", "test world")));
+ 
+   // World: Test World 2
+   EXPECT_FALSE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/test world 2"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "worlds", "test world2")));
+   clearIOStreams(stdOutBuffer, stdErrBuffer);
+   restoreIO();
+ }
+@@ -599,7 +609,7 @@ TEST_P(DownloadCollectionTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(Models))
+ /// Download only worlds
+ // Protocol "https" not supported or disabled in libcurl for Windows
+ // https://github.com/ignitionrobotics/ign-fuel-tools/issues/105
+-TEST_P(DownloadCollectionTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(Worlds))
++TEST_P(DownloadCollectionTest, Worlds)
+ {
+   cmdVerbosity("4");
+ 
+@@ -625,30 +635,35 @@ TEST_P(DownloadCollectionTest, IGN_UTILS_TEST_DISABLED_ON_WIN32(Worlds))
+   // Check files
+   // Model: Backpack
+   EXPECT_FALSE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/models/backpack"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "models", "backpack")));
+ 
+   // Model: TEAMBASE
+   EXPECT_FALSE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/models/teambase"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "models", "teambase")));
+ 
+   // World: Test World
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/test world"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "worlds", "test world")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/test world/2"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "worlds", "test world", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-      std::string("test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/") +
+-      "test world/2/test.world"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "worlds", "test world", "2", "test.world")));
+ 
+   // World: Test World 2
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      "test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/test world 2"));
+-  EXPECT_TRUE(
+-      ignition::common::isDirectory("test_cache/fuel.ignitionrobotics.org/"
+-                                    "openrobotics/worlds/test world 2/2"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "worlds", "test world 2")));
++  EXPECT_TRUE(ignition::common::isDirectory(
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "worlds", "test world 2", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-      std::string("test_cache/fuel.ignitionrobotics.org/openrobotics/worlds/") +
+-      "test world 2/2/test.world"));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
++      "worlds", "test world 2", "2", "test.world")));
+   clearIOStreams(stdOutBuffer, stdErrBuffer);
+   restoreIO();
+ }
+
+From c5b30639cdb9852dfe2c1bd1952843af9db42b3e Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Mon, 19 Apr 2021 11:58:06 +0200
+Subject: [PATCH 12/16] make linters happy
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/ign_src_TEST.cc | 124 ++++++++++++++++++++++----------------------
+ 1 file changed, 62 insertions(+), 62 deletions(-)
+
+diff --git a/src/ign_src_TEST.cc b/src/ign_src_TEST.cc
+index 0709a0c..622bb9a 100644
+--- a/src/ign_src_TEST.cc
++++ b/src/ign_src_TEST.cc
+@@ -447,14 +447,14 @@ TEST(FuelClientTest, WorldDownloadUnversioned)
+ 
+   // Check files
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-        "worlds", "test world")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "worlds", "test world", "2")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "worlds", "test world", "2", "test.world")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world", "2", "test.world")));
+ 
+   clearIOStreams(stdOutBuffer, stdErrBuffer);
+   restoreIO();
+@@ -497,47 +497,47 @@ TEST_P(DownloadCollectionTest, AllItems)
+   // Check files
+   // Model: Backpack
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-        "models", "backpack")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "models", "backpack")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "models", "backpack", "2")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "models", "backpack", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "models", "backpack", "2", "model.sdf")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "models", "backpack", "2", "model.sdf")));
+ 
+   // Model: TEAMBASE
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "models", "teambase")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "models", "teambase")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-     ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "models", "teambase", "2")));
++     ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "models", "teambase", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-     "models", "teambase", "2", "model.sdf")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++     "openrobotics", "models", "teambase", "2", "model.sdf")));
+ 
+   // World: Test World
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-        "worlds", "test world")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "worlds", "test world", "2")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "worlds", "test world", "2", "test.world")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world", "2", "test.world")));
+ 
+   // World: Test World 2
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "worlds", "test world 2")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world 2")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "worlds", "test world 2", "2")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world 2", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "worlds", "test world 2", "2", "test.world")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world 2", "2", "test.world")));
+   clearIOStreams(stdOutBuffer, stdErrBuffer);
+   restoreIO();
+ }
+@@ -572,35 +572,35 @@ TEST_P(DownloadCollectionTest, Models)
+   // Check files
+   // Model: Backpack
+   EXPECT_TRUE(ignition::common::isDirectory(
+-      ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-        "models", "backpack")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "models", "backpack")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "models", "backpack", "2")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "models", "backpack", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "models", "backpack", "2", "model.sdf")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "models", "backpack", "2", "model.sdf")));
+ 
+   // Model: TEAMBASE
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "models", "teambase")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "models", "teambase")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "models", "teambase", "2")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "models", "teambase", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "models", "teambase", "2", "model.sdf")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "models", "teambase", "2", "model.sdf")));
+ 
+   // World: Test World
+   EXPECT_FALSE(ignition::common::isDirectory(
+-      ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-        "worlds", "test world")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world")));
+ 
+   // World: Test World 2
+   EXPECT_FALSE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "worlds", "test world2")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world2")));
+   clearIOStreams(stdOutBuffer, stdErrBuffer);
+   restoreIO();
+ }
+@@ -635,35 +635,35 @@ TEST_P(DownloadCollectionTest, Worlds)
+   // Check files
+   // Model: Backpack
+   EXPECT_FALSE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "models", "backpack")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "models", "backpack")));
+ 
+   // Model: TEAMBASE
+   EXPECT_FALSE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "models", "teambase")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "models", "teambase")));
+ 
+   // World: Test World
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "worlds", "test world")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "worlds", "test world", "2")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "worlds", "test world", "2", "test.world")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world", "2", "test.world")));
+ 
+   // World: Test World 2
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "worlds", "test world 2")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world 2")));
+   EXPECT_TRUE(ignition::common::isDirectory(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "worlds", "test world 2", "2")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world 2", "2")));
+   EXPECT_TRUE(ignition::common::isFile(
+-    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org", "openrobotics",
+-      "worlds", "test world 2", "2", "test.world")));
++    ignition::common::joinPaths("test_cache", "fuel.ignitionrobotics.org",
++      "openrobotics", "worlds", "test world 2", "2", "test.world")));
+   clearIOStreams(stdOutBuffer, stdErrBuffer);
+   restoreIO();
+ }
+
+From 2bef678660d85e8d6a96f96cb681660c804f0667 Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Mon, 19 Apr 2021 13:33:57 +0200
+Subject: [PATCH 13/16] Fixed windows tests
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/LocalCache_TEST.cc | 7 +++++--
+ src/ModelIter.cc       | 5 ++++-
+ src/WorldIter.cc       | 6 +++++-
+ 3 files changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/src/LocalCache_TEST.cc b/src/LocalCache_TEST.cc
+index 10059b7..d30fe04 100644
+--- a/src/LocalCache_TEST.cc
++++ b/src/LocalCache_TEST.cc
+@@ -382,9 +382,12 @@ TEST_F(LocalCacheTest, AllWorlds)
+     ++iter;
+   }
+   EXPECT_EQ(9u, uniqueNames.size());
+-#ifndef _WIN32
++#ifdef _WIN32
++  EXPECT_NE(uniqueNames.end(), uniqueNames.find(
++    ignition::common::joinPaths("localhost8001", "alice", "worlds", "am1")));
++#else
+   EXPECT_NE(uniqueNames.end(), uniqueNames.find(
+-      "localhost:8001/alice/worlds/am1"));
++    ignition::common::joinPaths("localhost:8001", "alice", "worlds", "am1")));
+ #endif
+ }
+ 
+diff --git a/src/ModelIter.cc b/src/ModelIter.cc
+index ed1e8f9..3f19924 100644
+--- a/src/ModelIter.cc
++++ b/src/ModelIter.cc
+@@ -16,6 +16,7 @@
+ */
+ 
+ #include <memory>
++#include <regex>
+ #include <string>
+ #include <vector>
+ #include <ignition/common/Console.hh>
+@@ -168,7 +169,9 @@ IterRestIds::IterRestIds(const Rest &_rest, const ServerConfig &_config,
+ 
+     // Fire the request.
+     resp = this->rest.Request(method, this->config.Url().Str(),
+-      this->config.Version(), path, {queryStrPage}, headers, "");
++      this->config.Version(),
++      std::regex_replace(path, std::regex(R"(\\)"), "/"),
++      {queryStrPage}, headers, "");
+ 
+     // TODO(nkoenig): resp.statusCode should return != 200 when the page
+     // requested does
+diff --git a/src/WorldIter.cc b/src/WorldIter.cc
+index 06ccf1f..dd0aa63 100644
+--- a/src/WorldIter.cc
++++ b/src/WorldIter.cc
+@@ -16,6 +16,7 @@
+ */
+ 
+ #include <memory>
++#include <regex>
+ #include <string>
+ #include <vector>
+ #include <ignition/common/Console.hh>
+@@ -115,9 +116,12 @@ WorldIterRestIds::WorldIterRestIds(const Rest &_rest,
+   std::string queryStrPageKey = "page=";
+   do
+   {
++    // Fire the request.
+     // Fire the request.
+     resp = this->rest.Request(method, this->config.Url().Str(),
+-      this->config.Version(), _path, {queryStrPage}, headers, "");
++      this->config.Version(),
++      std::regex_replace(_path, std::regex(R"(\\)"), "/"),
++      {queryStrPage}, headers, "");
+ 
+     // Reset the query string
+     queryStrPage = "";
+
+From 044ee2e986567cc969b66c62066bcdd6edeef444 Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Tue, 11 May 2021 18:11:29 +0200
+Subject: [PATCH 14/16] Fixed tests
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/CollectionIdentifier_TEST.cc | 12 ++++++++++++
+ src/ModelIdentifier_TEST.cc      | 21 +++++++++++++++++++++
+ src/WorldIdentifier_TEST.cc      |  2 +-
+ 3 files changed, 34 insertions(+), 1 deletion(-)
+
+diff --git a/src/CollectionIdentifier_TEST.cc b/src/CollectionIdentifier_TEST.cc
+index 3f7381f..6fe674f 100644
+--- a/src/CollectionIdentifier_TEST.cc
++++ b/src/CollectionIdentifier_TEST.cc
+@@ -118,6 +118,17 @@ TEST(CollectionIdentifier, AsString)
+   common::Console::SetVerbosity(4);
+   {
+     CollectionIdentifier id;
++
++#ifndef _WIN32
++    std::string str =
++        "Name: \n"\
++        "Owner: \n"\
++        "Unique name: https://fuel.ignitionrobotics.org/collections/\n"
++        "Server:\n"
++        "  URL: https://fuel.ignitionrobotics.org\n"
++        "  Version: 1.0\n"
++        "  API key: \n";
++#else
+     std::string str =
+         "Name: \n"\
+         "Owner: \n"\
+@@ -126,6 +137,7 @@ TEST(CollectionIdentifier, AsString)
+         "  URL: https://fuel.ignitionrobotics.org\n"
+         "  Version: 1.0\n"
+         "  API key: \n";
++#endif
+     EXPECT_EQ(str, id.AsString());
+   }
+ 
+diff --git a/src/ModelIdentifier_TEST.cc b/src/ModelIdentifier_TEST.cc
+index 307e453..b1dd87e 100644
+--- a/src/ModelIdentifier_TEST.cc
++++ b/src/ModelIdentifier_TEST.cc
+@@ -148,6 +148,26 @@ TEST(ModelIdentifier, AsString)
+   common::Console::SetVerbosity(4);
+   {
+     ModelIdentifier id;
++#ifndef _WIN32
++    std::string str =
++        "Name: \n"\
++        "Owner: \n"\
++        "Version: tip\n"\
++        "Unique name: https://fuel.ignitionrobotics.org/models/\n"
++        "Description: \n"
++        "File size: 0\n"
++        "Upload date: 0\n"
++        "Likes: 0\n"
++        "Downloads: 0\n"
++        "License name: \n"
++        "License URL: \n"
++        "License image URL: \n"
++        "Tags: \n"
++        "Server:\n"
++        "  URL: https://fuel.ignitionrobotics.org\n"
++        "  Version: 1.0\n"
++        "  API key: \n";
++#else
+     std::string str =
+         "Name: \n"\
+         "Owner: \n"\
+@@ -166,6 +186,7 @@ TEST(ModelIdentifier, AsString)
+         "  URL: https://fuel.ignitionrobotics.org\n"
+         "  Version: 1.0\n"
+         "  API key: \n";
++#endif
+     EXPECT_EQ(str, id.AsString());
+   }
+ 
+diff --git a/src/WorldIdentifier_TEST.cc b/src/WorldIdentifier_TEST.cc
+index c0a9965..52d4cf0 100644
+--- a/src/WorldIdentifier_TEST.cc
++++ b/src/WorldIdentifier_TEST.cc
+@@ -120,7 +120,7 @@ TEST(WorldIdentifier, AsString)
+         "Name: \n"\
+         "Owner: \n"\
+         "Version: tip\n"\
+-        "Unique name: fuel.ignitionrobotics.org/worlds\n"
++        "Unique name: fuel.ignitionrobotics.org/worlds/\n"
+         "Local path: \n"
+         "Server:\n"
+         "  URL: https://fuel.ignitionrobotics.org\n"
+
+From bbae88ceb0786e1a21d5b1a1973b676ae8fe7d3b Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Fri, 14 May 2021 13:00:32 +0200
+Subject: [PATCH 15/16] Added feddback
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/ClientConfig_TEST.cc |  4 ++++
+ src/FuelClient.cc        |  8 --------
+ src/Zip.cc               | 11 +++++------
+ 3 files changed, 9 insertions(+), 14 deletions(-)
+
+diff --git a/src/ClientConfig_TEST.cc b/src/ClientConfig_TEST.cc
+index 4066936..372b200 100644
+--- a/src/ClientConfig_TEST.cc
++++ b/src/ClientConfig_TEST.cc
+@@ -35,7 +35,11 @@ using namespace fuel_tools;
+ /// \param[in] _path Path to file to be removed.
+ void removeFileTemp(const std::string &_path)
+ {
++#ifndef _WIN32
++  EXPECT_TRUE(ignition::common::removeFile(_path));
++#else
+   ignition::common::removeFile(_path);
++#endif
+ }
+ 
+ /////////////////////////////////////////////////
+diff --git a/src/FuelClient.cc b/src/FuelClient.cc
+index b98c32d..21f249b 100644
+--- a/src/FuelClient.cc
++++ b/src/FuelClient.cc
+@@ -986,14 +986,6 @@ bool FuelClient::ParseWorldFileUrl(const common::URI &_fileUrl,
+     return false;
+   }
+ 
+-  std::vector<std::string> tokens = ignition::common::split(file, "/");
+-  std::string fileTemp;
+-  for (auto s : tokens)
+-    fileTemp = ignition::common::joinPaths(fileTemp, s);
+-  if(fileTemp[0] == '/')
+-    fileTemp.erase(0, 1);
+-  file = fileTemp;
+-
+   // Get remaining server information from config
+   _id.Server().SetUrl(common::URI(scheme + "://" + server));
+   _id.Server().SetVersion(apiVersion);
+diff --git a/src/Zip.cc b/src/Zip.cc
+index 947daaf..55622e2 100644
+--- a/src/Zip.cc
++++ b/src/Zip.cc
+@@ -140,14 +140,13 @@ bool Zip::Extract(const std::string &_src,
+     common::changeFromUnixPath(entryname);
+     std::string dst = ignition::common::joinPaths(_dst, entryname);
+ 
+-    // Create intermediate directories if needed.
+-    std::string dirname = dst;
+-
++    // Check if the entryname contains a / at the end. if so it's a directory 
+     auto pos = entryname.rfind(ignition::common::separator(""));
+-    if (pos != std::string::npos && pos == (entryname.size() - 1)){
+-      if (!ignition::common::createDirectories(dirname))
++    if (pos != std::string::npos && pos == (entryname.size() - 1))
++    {
++      if (!ignition::common::createDirectories(dst))
+       {
+-        ignerr << "Error creating directory [" << dirname << "]. "
++        ignerr << "Error creating directory [" << dst << "]. "
+                << "Do you have the right permissions?" << std::endl;
+         return false;
+       }
+
+From 407515aff58dc68a5c9ff0d986c7e293d204cc27 Mon Sep 17 00:00:00 2001
+From: ahcorde <ahcorde@gmail.com>
+Date: Fri, 14 May 2021 13:47:07 +0200
+Subject: [PATCH 16/16] make linters happy
+
+Signed-off-by: ahcorde <ahcorde@gmail.com>
+---
+ src/Zip.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/Zip.cc b/src/Zip.cc
+index 55622e2..f4d5be8 100644
+--- a/src/Zip.cc
++++ b/src/Zip.cc
+@@ -140,7 +140,7 @@ bool Zip::Extract(const std::string &_src,
+     common::changeFromUnixPath(entryname);
+     std::string dst = ignition::common::joinPaths(_dst, entryname);
+ 
+-    // Check if the entryname contains a / at the end. if so it's a directory 
++    // Check if the entryname contains a / at the end. if so it's a directory
+     auto pos = entryname.rfind(ignition::common::separator(""));
+     if (pos != std::string::npos && pos == (entryname.size() - 1))
+     {
