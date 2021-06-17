@@ -36,7 +36,6 @@ requirements:
     - yaml
     - tinyxml2
     - libprotobuf
-    - protobuf
 
 test:
   commands:
