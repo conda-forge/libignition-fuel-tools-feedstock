@@ -1,5 +1,5 @@
 {% set base_name = "libignition-fuel-tools" %}
-{% set version = "4.3.0" %}
+{% set version = "4.4.0" %}
 {% set major_version = version.split('.')[0] %}
 {% set name = base_name + major_version %}
 
@@ -9,12 +9,10 @@ package:
 
 source:
   - url: https://github.com/ignitionrobotics/ign-fuel-tools/archive/ignition-fuel-tools{{ major_version }}_{{ version }}.tar.gz
-    sha256: 9f05c067a70059a22f46ccce37dcd02dd9fb7c9091608f61c8a0f4aee9b22a03
-    patches:
-      - fix_ignition_cmake_version.patch
+    sha256: aa888518a650ef68ce8c37d97f53c63861295e3b210a68b4be514a727b5ba228
 
 build:
-  number: 3
+  number: 0
   skip: false
   run_exports:
     - {{ pin_subpackage(name, max_pin='x') }}
@@ -28,6 +26,7 @@ requirements:
     - pkg-config             # [not win]
   host:
     - libignition-msgs5
+    - libignition-math6
     - libignition-common3
     - libignition-tools1
     - libcurl
