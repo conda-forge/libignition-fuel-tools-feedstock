@@ -17,7 +17,9 @@ jsoncpp:
 libcurl:
 - '7'
 libprotobuf:
-- '3.15'
+- '3.16'
+libzip:
+- '1'
 macos_machine:
 - x86_64-apple-darwin13.4.0
 pin_run_as_build:

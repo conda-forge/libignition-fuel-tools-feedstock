@@ -14,7 +14,7 @@ source:
       - fix_ignition_cmake_version.patch
 
 build:
-  number: 6
+  number: 7
   run_exports:
     - {{ pin_subpackage(name, max_pin='x') }}
 
@@ -34,9 +34,9 @@ requirements:
     - jsoncpp
     - libzip
     - yaml
-    - tinyxml2
+    - tinyxml2      # [not aarch64]
+    - tinyxml2 9.*  # [aarch64]
     - libprotobuf
-    - protobuf
 
 test:
   commands:
