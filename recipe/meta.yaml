@@ -34,7 +34,8 @@ requirements:
     - jsoncpp
     - libzip
     - yaml
-    - tinyxml2
+    - tinyxml2      # [not aarch64]
+    - tinyxml2 9.*  # [aarch64]
     - libprotobuf
 
 test:
