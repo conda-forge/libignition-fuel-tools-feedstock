@@ -11,7 +11,9 @@ jsoncpp:
 libcurl:
 - '7'
 libprotobuf:
-- '3.15'
+- '3.16'
+libzip:
+- '1'
 pin_run_as_build:
   jsoncpp:
     max_pin: x.x.x
