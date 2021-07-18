@@ -1,14 +1,15 @@
 {% set base_name = "libignition-fuel-tools" %}
-{% set version = "6.0.0" %}
-{% set major_version = version.split('.')[0] %}
+{% set version = "6_6.0.0" %}
+{% set version_package = version.split('_')[1] %}
+{% set major_version = version_package.split('.')[0] %}
 {% set name = base_name + major_version %}
 
 package:
   name: {{ name }}
-  version: {{ version }}
+  version: {{ version_package }}
 
 source:
-  - url: https://github.com/ignitionrobotics/ign-fuel-tools/archive/ignition-fuel-tools{{ major_version }}_{{ version }}.tar.gz
+  - url: https://github.com/ignitionrobotics/ign-fuel-tools/archive/ignition-fuel-tools{{ version }}.tar.gz
     sha256: 7be5f00cab43127109b598e01ebe76f173e259e3ff4df2e1c220def19a9de9be
 
 build:
