@@ -27,7 +27,7 @@ requirements:
   host:
     - libignition-cmake2
     - libignition-math6
-    - libignition-msgs7
+    - libignition-msgs8
     - libignition-common4
     - libignition-tools1
     - libcurl
