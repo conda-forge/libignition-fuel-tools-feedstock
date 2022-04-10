@@ -3,7 +3,7 @@ MACOSX_DEPLOYMENT_TARGET:
 c_compiler:
 - clang
 c_compiler_version:
-- '11'
+- '12'
 channel_sources:
 - conda-forge
 channel_targets:
@@ -11,13 +11,13 @@ channel_targets:
 cxx_compiler:
 - clangxx
 cxx_compiler_version:
-- '11'
+- '12'
 jsoncpp:
 - 1.9.5
 libcurl:
 - '7'
 libprotobuf:
-- '3.19'
+- '3.20'
 libzip:
 - '1'
 macos_machine:
