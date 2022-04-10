@@ -19,7 +19,7 @@ jsoncpp:
 libcurl:
 - '7'
 libprotobuf:
-- '3.19'
+- '3.20'
 libzip:
 - '1'
 pin_run_as_build:
