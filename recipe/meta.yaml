@@ -11,8 +11,6 @@ package:
 source:
   - url: https://github.com/ignitionrobotics/ign-fuel-tools/archive/ignition-fuel-tools{{ version }}.tar.gz
     sha256: 45bc8a6fa61da8ec8e75f488a91c433ec3db0276815bdbfc7db47ee659bd59e9
-    patches:
-      - 219.patch
 
 build:
   number: 0
