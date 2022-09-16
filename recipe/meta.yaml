@@ -1,5 +1,5 @@
 {% set base_name = "libignition-fuel-tools" %}
-{% set version = "4.4.0" %}
+{% set version = "4.6.0" %}
 {% set major_version = version.split('.')[0] %}
 {% set name = base_name + major_version %}
 
@@ -12,8 +12,7 @@ source:
     sha256: ad218743ac35cc71f5324a13a34959c596c1d6e5c25da52870fcbab02432939d
 
 build:
-  number: 8
-  skip: false
+  number: 0
   run_exports:
     - {{ pin_subpackage(name, max_pin='x') }}
 
@@ -23,7 +22,7 @@ requirements:
     - {{ compiler('c') }}
     - cmake
     - ninja
-    - pkg-config             # [not win]
+    - pkg-config
   host:
     - libignition-msgs5
     - libignition-math6
