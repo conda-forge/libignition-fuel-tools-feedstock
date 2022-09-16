@@ -1,5 +1,5 @@
 {% set base_name = "libignition-fuel-tools" %}
-{% set version = "4.4.0" %}
+{% set version = "4.6.0" %}
 {% set major_version = version.split('.')[0] %}
 {% set name = base_name + major_version %}
 
@@ -8,12 +8,11 @@ package:
   version: {{ version }}
 
 source:
-  - url: https://github.com/ignitionrobotics/ign-fuel-tools/archive/ignition-fuel-tools{{ major_version }}_{{ version }}.tar.gz
-    sha256: ad218743ac35cc71f5324a13a34959c596c1d6e5c25da52870fcbab02432939d
+  - url: https://github.com/gazebosim/gz-fuel-tools/archive/ignition-fuel-tools{{ major_version }}_{{ version }}.tar.gz
+    sha256: b28aa33003dc133f9bc08cdfeba592867cf14ef79a5ceef5f03310b3320e1062
 
 build:
-  number: 8
-  skip: false
+  number: 0
   run_exports:
     - {{ pin_subpackage(name, max_pin='x') }}
 
@@ -23,7 +22,7 @@ requirements:
     - {{ compiler('c') }}
     - cmake
     - ninja
-    - pkg-config             # [not win]
+    - pkg-config
   host:
     - libignition-msgs5
     - libignition-math6
