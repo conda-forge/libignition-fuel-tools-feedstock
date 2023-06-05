@@ -37,7 +37,7 @@ requirements:
     - tinyxml2
     - libprotobuf
     # Workaround for https://github.com/conda-forge/zlib-feedstock/issues/69#issuecomment-1577437024
-    - zlib
+    - zlib  # [win]
 
 test:
   commands:
