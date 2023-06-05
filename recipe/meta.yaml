@@ -13,7 +13,7 @@ source:
     sha256: 45bc8a6fa61da8ec8e75f488a91c433ec3db0276815bdbfc7db47ee659bd59e9
 
 build:
-  number: 1
+  number: 2
   run_exports:
     - {{ pin_subpackage(name, max_pin='x') }}
 
@@ -36,6 +36,8 @@ requirements:
     - yaml
     - tinyxml2
     - libprotobuf
+    # Workaround for https://github.com/conda-forge/zlib-feedstock/issues/69#issuecomment-1577437024
+    - zlib  # [win]
 
 test:
   commands:
