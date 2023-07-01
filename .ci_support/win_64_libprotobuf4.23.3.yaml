@@ -11,10 +11,12 @@ jsoncpp:
 libcurl:
 - '8'
 libprotobuf:
-- 4.23.2
+- 4.23.3
 libzip:
 - '1'
 target_platform:
 - win-64
 tinyxml2:
 - '9'
+zlib:
+- '1.2'
