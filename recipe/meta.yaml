@@ -37,6 +37,7 @@ requirements:
     # Workaround for https://github.com/conda-forge/zlib-feedstock/issues/69#issuecomment-1577437024
     - zlib  # [win]
 
+
 test:
   commands:
     - test -f ${PREFIX}/include/ignition/fuel_tools{{ major_version }}/ignition/fuel_tools.hh  # [not win]
