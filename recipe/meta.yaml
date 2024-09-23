@@ -12,7 +12,7 @@ source:
     sha256: b28aa33003dc133f9bc08cdfeba592867cf14ef79a5ceef5f03310b3320e1062
 
 build:
-  number: 9
+  number: 10
   run_exports:
     - {{ pin_subpackage(name, max_pin='x') }}
 
@@ -20,6 +20,7 @@ requirements:
   build:
     - {{ compiler('cxx') }}
     - {{ compiler('c') }}
+    - {{ stdlib("c") }}
     - cmake
     - ninja
     - pkg-config
