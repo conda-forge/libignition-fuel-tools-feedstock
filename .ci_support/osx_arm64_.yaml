@@ -23,7 +23,7 @@ jsoncpp:
 libcurl:
 - '8'
 libprotobuf:
-- 5.28.3
+- 5.29.3
 libzip:
 - '1'
 macos_machine:
@@ -31,7 +31,7 @@ macos_machine:
 target_platform:
 - osx-arm64
 tinyxml2:
-- '10'
+- '10.0'
 zip_keys:
 - - c_compiler_version
   - cxx_compiler_version

@@ -23,13 +23,13 @@ jsoncpp:
 libcurl:
 - '8'
 libprotobuf:
-- 5.28.3
+- 5.29.3
 libzip:
 - '1'
 target_platform:
 - linux-aarch64
 tinyxml2:
-- '10'
+- '10.0'
 zip_keys:
 - - c_compiler_version
   - cxx_compiler_version
