@@ -1,0 +1,12 @@
+diff --git a/src/FuelClient.cc b/src/FuelClient.cc
+index 58f4b4fe..52a0f31a 100644
+--- a/src/FuelClient.cc
++++ b/src/FuelClient.cc
+@@ -31,6 +31,7 @@
+ #include <memory>
+ #include <regex>
+ #include <string>
++#include <thread>
+ 
+ #include <gz/common/Console.hh>
+ #include <gz/common/Filesystem.hh>
