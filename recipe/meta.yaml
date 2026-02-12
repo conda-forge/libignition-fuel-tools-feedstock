@@ -10,9 +10,11 @@ package:
 source:
   - url: https://github.com/gazebosim/gz-fuel-tools/archive/ignition-fuel-tools{{ major_version }}_{{ version }}.tar.gz
     sha256: b28aa33003dc133f9bc08cdfeba592867cf14ef79a5ceef5f03310b3320e1062
+    patches:
+      - add-missing-thread-include.patch
 
 build:
-  number: 16
+  number: 17
   run_exports:
     - {{ pin_subpackage(name, max_pin='x') }}
 
