@@ -14,7 +14,7 @@ source:
       - add-missing-thread-include.patch
 
 build:
-  number: 17
+  number: 18
   run_exports:
     - {{ pin_subpackage(name, max_pin='x') }}
 
